@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import Decimal from 'decimal.js';
 import { RatedCharge } from './entities/rated-charge.entity';
 import { AggregatedUsage } from '../aggregation/entities/aggregated-usage.entity';
 import { PriceBooksService } from '../price-books/price-books.service';
@@ -81,9 +82,9 @@ export class RatingService {
       priceBookId: priceBook.priceBookId,
       priceVersion: priceBook.version,
       ruleId: priceRule.ruleId,
-      quantity: String(quantity),
-      unitPrice: String(unitPrice),
-      subtotal: String(totalAmount),
+      quantity: new Decimal(quantity).toFixed(6),
+      unitPrice: new Decimal(unitPrice).toFixed(6),
+      subtotal: totalAmount, // Already a string from calculateCharge
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       calculationMetadata: calculationMetadata as any,
       calculatedAt: new Date(),
@@ -104,7 +105,7 @@ export class RatingService {
   private calculateCharge(
     priceRule: { pricingModel: string; tiers: Array<{ unitPrice: number }> },
     quantity: number,
-  ): { totalAmount: number; calculationMetadata: Record<string, any> } {
+  ): { totalAmount: string; calculationMetadata: Record<string, any> } {
     const { pricingModel, tiers } = priceRule;
     const unitPrice = tiers.length > 0 ? tiers[0].unitPrice : 0;
 
@@ -139,14 +140,15 @@ export class RatingService {
   }
 
   private calculateFlat(unitPrice: number): {
-    totalAmount: number;
+    totalAmount: string;
     calculationMetadata: Record<string, any>;
   } {
+    const amount = new Decimal(unitPrice);
     return {
-      totalAmount: unitPrice,
+      totalAmount: amount.toFixed(2),
       calculationMetadata: {
         model: 'flat',
-        unitPrice,
+        unitPrice: unitPrice.toString(),
       },
     };
   }
@@ -154,16 +156,18 @@ export class RatingService {
   private calculatePerUnit(
     unitPrice: number,
     quantity: number,
-  ): { totalAmount: number; calculationMetadata: Record<string, any> } {
-    const totalAmount = unitPrice * quantity;
+  ): { totalAmount: string; calculationMetadata: Record<string, any> } {
+    const price = new Decimal(unitPrice);
+    const qty = new Decimal(quantity);
+    const totalAmount = price.times(qty);
 
     return {
-      totalAmount,
+      totalAmount: totalAmount.toFixed(2),
       calculationMetadata: {
         model: 'per_unit',
-        unitPrice,
-        quantity,
-        calculation: `${unitPrice} × ${quantity} = ${totalAmount}`,
+        unitPrice: price.toString(),
+        quantity: qty.toString(),
+        calculation: `${price.toString()} × ${qty.toString()} = ${totalAmount.toString()}`,
       },
     };
   }
