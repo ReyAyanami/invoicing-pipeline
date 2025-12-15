@@ -91,6 +91,7 @@ Comprehensive documentation for the usage-based metering and invoicing pipeline 
 3. Skim [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) for visual understanding
 
 **Then** (1-2 hours):
+
 4. Work through [GETTING_STARTED.md](docs/GETTING_STARTED.md)
 5. Run the system and send your first events
 6. Trace an event through to an invoice

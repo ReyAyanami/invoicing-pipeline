@@ -45,6 +45,7 @@ This installs:
 - NestJS framework
 - TypeORM for database
 - KafkaJS for event streaming
+- Decimal.js for precise financial calculations
 - Testing libraries
 
 ---

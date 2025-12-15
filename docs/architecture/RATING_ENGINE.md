@@ -160,12 +160,14 @@ Tier 3:  2,500 calls × $0.010 = $25.00
 **Implementation**:
 
 ```typescript
+import { Decimal } from 'decimal.js';
+
 function calculateTieredCharge(
   quantity: number,
   tiers: PriceTier[]
 ): { total: number; breakdown: TierBreakdown[] } {
-  let remaining = quantity;
-  let total = 0;
+  let remaining = new Decimal(quantity);
+  let total = new Decimal(0);
   const breakdown: TierBreakdown[] = [];
   
   for (let i = 0; i < tiers.length; i++) {
@@ -174,25 +176,28 @@ function calculateTieredCharge(
     const previousLimit = i > 0 ? tiers[i - 1].up_to || 0 : 0;
     
     const tierCapacity = tierLimit - previousLimit;
-    const unitsInTier = Math.min(remaining, tierCapacity);
+    const unitsInTier = Decimal.min(remaining, tierCapacity);
     
-    if (unitsInTier <= 0) break;
+    if (unitsInTier.lte(0)) break;
     
-    const tierCharge = unitsInTier * tier.unit_price;
-    total += tierCharge;
+    const tierCharge = unitsInTier.times(tier.unit_price);
+    total = total.plus(tierCharge);
     
     breakdown.push({
       tier: i + 1,
-      units: unitsInTier,
+      units: unitsInTier.toNumber(),
       unit_price: tier.unit_price,
-      charge: tierCharge
+      charge: tierCharge.toDecimalPlaces(2).toNumber()
     });
     
-    remaining -= unitsInTier;
-    if (remaining <= 0) break;
+    remaining = remaining.minus(unitsInTier);
+    if (remaining.lte(0)) break;
   }
   
-  return { total: Math.round(total * 100) / 100, breakdown };
+  return { 
+    total: total.toDecimalPlaces(2).toNumber(), 
+    breakdown 
+  };
 }
 ```
 
@@ -401,7 +406,51 @@ await saveRatedCharge(charge);
 0.1 + 0.2 === 0.3  // false (actually 0.30000000000000004)
 ```
 
-### Solution: Cents-Based Math
+### Solution: Use Decimal.js
+
+**Recommended approach** for production systems:
+
+```typescript
+import { Decimal } from 'decimal.js';
+
+// Configure for currency (2 decimal places)
+Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
+
+function calculateCharge(unitPrice: number, quantity: number): number {
+  const price = new Decimal(unitPrice);
+  const qty = new Decimal(quantity);
+  
+  return price.times(qty).toDecimalPlaces(2).toNumber();
+}
+
+// Example
+calculateCharge(0.02, 1234);  // $24.68 (exact)
+
+// Complex calculations
+const total = new Decimal('10.5')
+  .times('3.33')
+  .plus('5.00')
+  .toDecimalPlaces(2);  // 39.97
+```
+
+**Why Decimal.js?**
+- ✅ Arbitrary precision arithmetic
+- ✅ No floating point errors
+- ✅ Industry standard for financial calculations
+- ✅ Explicit rounding control
+- ✅ Chainable operations
+
+**Installation**:
+```bash
+npm install decimal.js
+npm install --save-dev @types/decimal.js
+```
+
+---
+
+### Alternative: Cents-Based Math (Educational)
+
+If you can't use external libraries, manual cents-based math works:
 
 ```typescript
 function multiply(amount: number, quantity: number): number {
@@ -416,6 +465,8 @@ function multiply(amount: number, quantity: number): number {
 // Example
 multiply(0.02, 1234);  // $24.68 (exact)
 ```
+
+**Limitations**: Only works for simple operations, gets complex quickly.
 
 ### Rounding Rules
 

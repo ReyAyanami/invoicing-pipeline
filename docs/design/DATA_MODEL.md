@@ -2,6 +2,27 @@
 
 Database schema for the usage-based metering and invoicing pipeline.
 
+## Precision & Data Types
+
+**Critical**: Financial calculations require exact precision.
+
+- **Database**: Use `DECIMAL(p, s)` types, never `FLOAT` or `DOUBLE`
+- **Application**: Use `decimal.js` library, never native JavaScript `number` for calculations
+- **API**: Accept/return strings for monetary values to avoid JSON precision loss
+
+```typescript
+// ✅ Correct approach
+import { Decimal } from 'decimal.js';
+const charge = new Decimal('10.99').times('1234').toDecimalPlaces(2);
+
+// ❌ Wrong approach
+const charge = 10.99 * 1234;  // Floating point errors
+```
+
+See [Rating Engine - Rounding & Precision](../architecture/RATING_ENGINE.md#rounding--precision) for details.
+
+---
+
 ## Schema Overview
 
 ```
