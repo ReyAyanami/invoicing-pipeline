@@ -34,6 +34,40 @@ export default tseslint.config(
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
+      // Prevent Number() arithmetic on monetary values
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression[callee.name="Number"][arguments.0.type="MemberExpression"][arguments.0.property.name=/^(subtotal|total|amount|price|unitPrice|tax|creditsApplied|quantity|value)$/]',
+          message:
+            'Use Money or Quantity utilities from @/common/types instead of Number() for monetary/quantity calculations to prevent floating-point precision errors',
+        },
+        {
+          selector:
+            'BinaryExpression[operator="+"]:has(MemberExpression[property.name=/^(subtotal|total|amount|price|unitPrice|tax|creditsApplied)$/])',
+          message:
+            'Use Money.add() instead of + operator on monetary values to prevent floating-point precision errors',
+        },
+        {
+          selector:
+            'BinaryExpression[operator="-"]:has(MemberExpression[property.name=/^(subtotal|total|amount|price|unitPrice|tax|creditsApplied)$/])',
+          message:
+            'Use Money.subtract() instead of - operator on monetary values to prevent floating-point precision errors',
+        },
+        {
+          selector:
+            'BinaryExpression[operator="*"]:has(MemberExpression[property.name=/^(subtotal|total|amount|price|unitPrice|tax|creditsApplied)$/])',
+          message:
+            'Use Money.multiply() instead of * operator on monetary values to prevent floating-point precision errors',
+        },
+        {
+          selector:
+            'BinaryExpression[operator="/"]:has(MemberExpression[property.name=/^(subtotal|total|amount|price|unitPrice|tax|creditsApplied)$/])',
+          message:
+            'Use Money.divide() instead of / operator on monetary values to prevent floating-point precision errors',
+        },
+      ],
     },
   },
 );

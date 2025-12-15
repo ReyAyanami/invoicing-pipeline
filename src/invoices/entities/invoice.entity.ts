@@ -10,6 +10,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { InvoiceLineItem } from './invoice-line-item.entity';
+import { Money } from '../../common/types';
 
 @Entity('invoices')
 @Index(['customerId', 'billingPeriodStart'])
@@ -41,10 +42,10 @@ export class Invoice {
   billingPeriodEnd: Date;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  subtotal: string;
+  subtotal: Money;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
-  tax: string;
+  tax: Money;
 
   @Column({
     name: 'credits_applied',
@@ -53,10 +54,10 @@ export class Invoice {
     scale: 2,
     default: 0,
   })
-  creditsApplied: string;
+  creditsApplied: Money;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  total: string;
+  total: Money;
 
   @Column({ type: 'varchar', length: 3, default: 'USD' })
   currency: string;

@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Invoice } from './invoice.entity';
+import { Money, Quantity } from '../../common/types';
 
 @Entity('invoice_line_items')
 @Index(['invoiceId', 'lineNumber'])
@@ -35,7 +36,7 @@ export class InvoiceLineItem {
   metricType: string | null;
 
   @Column({ type: 'decimal', precision: 20, scale: 6, nullable: true })
-  quantity: string | null;
+  quantity: Quantity | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   unit: string | null;
@@ -47,10 +48,10 @@ export class InvoiceLineItem {
     scale: 6,
     nullable: true,
   })
-  unitPrice: string | null;
+  unitPrice: Money | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  amount: string;
+  amount: Money;
 
   @Column({ name: 'charge_ids', type: 'uuid', array: true })
   chargeIds: string[];

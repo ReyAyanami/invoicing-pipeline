@@ -10,6 +10,7 @@ import {
 import { AggregatedUsage } from '../../aggregation/entities/aggregated-usage.entity';
 import { PriceBook } from '../../price-books/entities/price-book.entity';
 import { PriceRule } from '../../price-books/entities/price-rule.entity';
+import { Money, Quantity } from '../../common/types';
 
 export interface CalculationMetadata {
   formula: string;
@@ -61,13 +62,13 @@ export class RatedCharge {
   rule: PriceRule;
 
   @Column({ type: 'decimal', precision: 20, scale: 6 })
-  quantity: string;
+  quantity: Quantity;
 
   @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 6 })
-  unitPrice: string;
+  unitPrice: Money;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  subtotal: string;
+  subtotal: Money;
 
   @Column({ type: 'varchar', length: 3, default: 'USD' })
   currency: string;

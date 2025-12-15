@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import Decimal from 'decimal.js';
 import { Invoice } from './entities/invoice.entity';
 import { InvoiceLineItem } from './entities/invoice-line-item.entity';
 import { RatedCharge } from '../rating/entities/rated-charge.entity';
 import { RatingService } from '../rating/rating.service';
 import { CustomersService } from '../customers/customers.service';
 import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
+import { Money, Quantity } from '../common/types';
 
 /**
  * Invoices Service
@@ -60,13 +60,11 @@ export class InvoicesService {
     // Group charges by metric type
     const chargesByMetric = this.groupChargesByMetric(charges);
 
-    // Calculate totals using Decimal for precision
-    const subtotal = charges.reduce(
-      (sum, charge) => sum.plus(new Decimal(charge.subtotal)),
-      new Decimal(0),
-    );
-    const tax = new Decimal(0); // TODO: Implement tax calculation
-    const total = subtotal.plus(tax);
+    // Calculate totals using Money utilities for precision
+    const chargeAmounts = charges.map((c) => c.subtotal);
+    const subtotal = Money.sum(chargeAmounts);
+    const tax = Money.zero(); // TODO: Implement tax calculation
+    const total = Money.add(subtotal, tax);
 
     // Generate invoice number
     const invoiceNumber = `INV-${Date.now()}`;
@@ -77,9 +75,9 @@ export class InvoicesService {
       customerId,
       billingPeriodStart: new Date(periodStart),
       billingPeriodEnd: new Date(periodEnd),
-      subtotal: subtotal.toFixed(2),
-      tax: tax.toFixed(2),
-      total: total.toFixed(2),
+      subtotal,
+      tax,
+      total,
       status: 'draft',
       issuedAt: null,
     });
@@ -93,7 +91,7 @@ export class InvoicesService {
     );
 
     this.logger.log(
-      `Generated invoice ${savedInvoice.invoiceId} for customer ${customerId}: $${total.toFixed(2)} (${lineItems.length} line items)`,
+      `Generated invoice ${savedInvoice.invoiceId} for customer ${customerId}: $${total} (${lineItems.length} line items)`,
     );
 
     // Fetch complete invoice with line items
@@ -126,30 +124,27 @@ export class InvoicesService {
     let lineNumber = 1;
 
     for (const [metricType, charges] of chargesByMetric.entries()) {
-      // Sum quantity and amount using Decimal for precision
-      const quantity = charges.reduce(
-        (sum, charge) => sum.plus(new Decimal(charge.quantity)),
-        new Decimal(0),
-      );
-      const amount = charges.reduce(
-        (sum, charge) => sum.plus(new Decimal(charge.subtotal)),
-        new Decimal(0),
-      );
+      // Sum quantity and amount using Money/Quantity utilities for precision
+      const quantities = charges.map((c) => c.quantity);
+      const amounts = charges.map((c) => c.subtotal);
 
-      // Calculate unit price with Decimal
-      const unitPrice = quantity.greaterThan(0)
-        ? amount.dividedBy(quantity)
-        : new Decimal(0);
+      const quantity = Quantity.add(...quantities);
+      const amount = Money.sum(amounts);
+
+      // Calculate unit price
+      const unitPrice = Money.greaterThan(quantity, '0')
+        ? Money.divide(amount, quantity)
+        : Money.zero();
 
       const lineItem = this.lineItemRepository.create({
         invoiceId,
         lineNumber: lineNumber++,
         description: `${metricType} usage`,
         metricType,
-        quantity: quantity.toFixed(6),
+        quantity,
         unit: 'units',
-        unitPrice: unitPrice.toFixed(6),
-        amount: amount.toFixed(2),
+        unitPrice,
+        amount,
         chargeIds: charges.map((c) => c.chargeId),
       });
 

@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { Quantity } from '../../common/types';
 
 @Entity('aggregated_usage')
 @Index(['customerId', 'windowStart'])
@@ -35,7 +36,7 @@ export class AggregatedUsage {
   windowEnd: Date;
 
   @Column({ type: 'decimal', precision: 20, scale: 6 })
-  value: string;
+  value: Quantity;
 
   @Column({ type: 'varchar', length: 50 })
   unit: string;
