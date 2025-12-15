@@ -12,7 +12,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER || 'billing',
   password: process.env.DATABASE_PASSWORD || 'billing_dev_password',
   database: process.env.DATABASE_NAME || 'billing_db',
-  entities: [__dirname + '/entities/*.entity{.ts,.js}'],
+  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,
   logging: process.env.DATABASE_LOGGING === 'true',

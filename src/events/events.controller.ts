@@ -21,8 +21,8 @@ export class EventsController {
     const event = await this.eventsService.ingest(createEventDto);
     return {
       status: 'accepted',
-      event_id: event.event_id,
-      ingestion_time: event.ingestion_time,
+      eventId: event.eventId,
+      ingestionTime: event.ingestionTime,
     };
   }
 

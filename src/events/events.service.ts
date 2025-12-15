@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
+import { TelemetryEvent } from './entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { KafkaService } from '../kafka/kafka.service';
 import { KAFKA_TOPICS } from '../kafka/constants';
@@ -17,46 +17,46 @@ export class EventsService {
   ) {}
 
   async ingest(createEventDto: CreateEventDto): Promise<TelemetryEvent> {
-    // Check for duplicate event_id
+    // Check for duplicate eventId
     const existing = await this.telemetryEventRepository.findOne({
-      where: { event_id: createEventDto.event_id },
+      where: { eventId: createEventDto.eventId },
     });
 
     if (existing) {
-      this.logger.warn(`Duplicate event_id: ${createEventDto.event_id}`);
+      this.logger.warn(`Duplicate eventId: ${createEventDto.eventId}`);
       throw new ConflictException(
-        `Event with id ${createEventDto.event_id} already exists`,
+        `Event with id ${createEventDto.eventId} already exists`,
       );
     }
 
     const event = this.telemetryEventRepository.create({
-      event_id: createEventDto.event_id,
-      event_type: createEventDto.event_type,
-      customer_id: createEventDto.customer_id,
-      event_time: new Date(createEventDto.event_time),
-      ingestion_time: new Date(),
+      eventId: createEventDto.eventId,
+      eventType: createEventDto.eventType,
+      customerId: createEventDto.customerId,
+      eventTime: new Date(createEventDto.eventTime),
+      ingestionTime: new Date(),
       metadata: createEventDto.metadata || {},
       source: createEventDto.source || null,
     });
 
     const saved = await this.telemetryEventRepository.save(event);
-    this.logger.log(`Ingested event: ${saved.event_id}`);
+    this.logger.log(`Ingested event: ${saved.eventId}`);
 
     // Publish to Kafka for downstream processing
     try {
       await this.kafkaService.sendMessage(KAFKA_TOPICS.TELEMETRY_EVENTS, {
-        event_id: saved.event_id,
-        event_type: saved.event_type,
-        customer_id: saved.customer_id,
-        event_time: saved.event_time.toISOString(),
-        ingestion_time: saved.ingestion_time.toISOString(),
+        eventId: saved.eventId,
+        eventType: saved.eventType,
+        customerId: saved.customerId,
+        eventTime: saved.eventTime.toISOString(),
+        ingestionTime: saved.ingestionTime.toISOString(),
         metadata: saved.metadata,
         source: saved.source,
       });
-      this.logger.debug(`Event published to Kafka: ${saved.event_id}`);
+      this.logger.debug(`Event published to Kafka: ${saved.eventId}`);
     } catch (error) {
       this.logger.error(
-        `Failed to publish event to Kafka: ${saved.event_id}`,
+        `Failed to publish event to Kafka: ${saved.eventId}`,
         error,
       );
       // Don't fail the request if Kafka publish fails
@@ -74,19 +74,19 @@ export class EventsService {
     const query = this.telemetryEventRepository.createQueryBuilder('event');
 
     if (customerId) {
-      query.andWhere('event.customer_id = :customerId', { customerId });
+      query.andWhere('event.customerId = :customerId', { customerId });
     }
 
     if (eventType) {
-      query.andWhere('event.event_type = :eventType', { eventType });
+      query.andWhere('event.eventType = :eventType', { eventType });
     }
 
-    return query.orderBy('event.event_time', 'DESC').limit(limit).getMany();
+    return query.orderBy('event.eventTime', 'DESC').limit(limit).getMany();
   }
 
   async findOne(eventId: string): Promise<TelemetryEvent | null> {
     return this.telemetryEventRepository.findOne({
-      where: { event_id: eventId },
+      where: { eventId },
     });
   }
 }

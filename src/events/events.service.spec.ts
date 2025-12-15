@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventsService } from './events.service';
-import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
+import { TelemetryEvent } from './entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { KafkaService } from '../kafka/kafka.service';
 
@@ -46,10 +46,10 @@ describe('EventsService', () => {
 
   describe('ingest', () => {
     const createEventDto: CreateEventDto = {
-      event_id: '123e4567-e89b-12d3-a456-426614174000',
-      event_type: 'api_call',
-      customer_id: '123e4567-e89b-12d3-a456-426614174001',
-      event_time: '2024-01-15T14:23:45Z',
+      eventId: '123e4567-e89b-12d3-a456-426614174000',
+      eventType: 'api_call',
+      customerId: '123e4567-e89b-12d3-a456-426614174001',
+      eventTime: '2024-01-15T14:23:45Z',
       metadata: { endpoint: '/api/users' },
       source: 'api-gateway',
     };
@@ -59,60 +59,60 @@ describe('EventsService', () => {
       mockRepository.create.mockReturnValue(createEventDto);
       mockRepository.save.mockResolvedValue({
         ...createEventDto,
-        event_time: new Date(createEventDto.event_time),
-        ingestion_time: new Date(),
-        created_at: new Date(),
+        eventTime: new Date(createEventDto.eventTime),
+        ingestionTime: new Date(),
+        createdAt: new Date(),
       });
       mockKafkaService.sendMessage.mockResolvedValue(undefined);
 
       const result = await service.ingest(createEventDto);
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { event_id: createEventDto.event_id },
+        where: { eventId: createEventDto.eventId },
       });
       expect(mockRepository.create).toHaveBeenCalled();
       expect(mockRepository.save).toHaveBeenCalled();
       expect(mockKafkaService.sendMessage).toHaveBeenCalled();
-      expect(result.event_id).toBe(createEventDto.event_id);
+      expect(result.eventId).toBe(createEventDto.eventId);
     });
 
-    it('should throw ConflictException for duplicate event_id', async () => {
+    it('should throw ConflictException for duplicate eventId', async () => {
       mockRepository.findOne.mockResolvedValue({
-        event_id: createEventDto.event_id,
+        eventId: createEventDto.eventId,
       });
 
       await expect(service.ingest(createEventDto)).rejects.toThrow(
         ConflictException,
       );
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { event_id: createEventDto.event_id },
+        where: { eventId: createEventDto.eventId },
       });
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 
     it('should handle events without optional fields', async () => {
       const minimalDto: CreateEventDto = {
-        event_id: '123e4567-e89b-12d3-a456-426614174002',
-        event_type: 'api_call',
-        customer_id: '123e4567-e89b-12d3-a456-426614174001',
-        event_time: '2024-01-15T14:23:45Z',
+        eventId: '123e4567-e89b-12d3-a456-426614174002',
+        eventType: 'api_call',
+        customerId: '123e4567-e89b-12d3-a456-426614174001',
+        eventTime: '2024-01-15T14:23:45Z',
       };
 
       mockRepository.findOne.mockResolvedValue(null);
       mockRepository.create.mockReturnValue(minimalDto);
       mockRepository.save.mockResolvedValue({
         ...minimalDto,
-        event_time: new Date(minimalDto.event_time),
+        eventTime: new Date(minimalDto.eventTime),
         metadata: {},
         source: null,
-        ingestion_time: new Date(),
-        created_at: new Date(),
+        ingestionTime: new Date(),
+        createdAt: new Date(),
       });
       mockKafkaService.sendMessage.mockResolvedValue(undefined);
 
       const result = await service.ingest(minimalDto);
 
-      expect(result.event_id).toBe(minimalDto.event_id);
+      expect(result.eventId).toBe(minimalDto.eventId);
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: {},
@@ -180,17 +180,17 @@ describe('EventsService', () => {
   describe('findOne', () => {
     it('should return an event by id', async () => {
       const mockEvent = {
-        event_id: '123e4567-e89b-12d3-a456-426614174000',
-        event_type: 'api_call',
+        eventId: '123e4567-e89b-12d3-a456-426614174000',
+        eventType: 'api_call',
       };
 
       mockRepository.findOne.mockResolvedValue(mockEvent);
 
-      const result = await service.findOne(mockEvent.event_id);
+      const result = await service.findOne(mockEvent.eventId);
 
       expect(result).toEqual(mockEvent);
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { event_id: mockEvent.event_id },
+        where: { eventId: mockEvent.eventId },
       });
     });
 

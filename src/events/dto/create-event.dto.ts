@@ -10,19 +10,19 @@ import {
 export class CreateEventDto {
   @IsUUID()
   @IsNotEmpty()
-  event_id: string;
+  eventId: string;
 
   @IsString()
   @IsNotEmpty()
-  event_type: string;
+  eventType: string;
 
   @IsUUID()
   @IsNotEmpty()
-  customer_id: string;
+  customerId: string;
 
   @IsDateString()
   @IsNotEmpty()
-  event_time: string;
+  eventTime: string;
 
   @IsObject()
   @IsOptional()

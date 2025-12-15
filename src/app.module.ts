@@ -4,6 +4,11 @@ import { DatabaseModule } from './database/database.module';
 import { KafkaModule } from './kafka/kafka.module';
 import { EventsModule } from './events/events.module';
 import { HealthModule } from './health/health.module';
+import { CustomersModule } from './customers/customers.module';
+import { PriceBooksModule } from './price-books/price-books.module';
+import { AggregationModule } from './aggregation/aggregation.module';
+import { RatingModule } from './rating/rating.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -15,6 +20,11 @@ import { HealthModule } from './health/health.module';
     KafkaModule,
     HealthModule,
     EventsModule,
+    CustomersModule,
+    PriceBooksModule,
+    AggregationModule,
+    RatingModule,
+    InvoicesModule,
   ],
 })
 export class AppModule {}

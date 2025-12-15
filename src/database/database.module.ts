@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import {
-  Customer,
-  TelemetryEvent,
-  AggregatedUsage,
-  PriceBook,
-  PriceRule,
-  RatedCharge,
-  Invoice,
-  InvoiceLineItem,
-} from './entities';
+import { Customer } from '../customers/entities/customer.entity';
+import { TelemetryEvent } from '../events/entities/telemetry-event.entity';
+import { AggregatedUsage } from '../aggregation/entities/aggregated-usage.entity';
+import { PriceBook } from '../price-books/entities/price-book.entity';
+import { PriceRule } from '../price-books/entities/price-rule.entity';
+import { RatedCharge } from '../rating/entities/rated-charge.entity';
+import { Invoice } from '../invoices/entities/invoice.entity';
+import { InvoiceLineItem } from '../invoices/entities/invoice-line-item.entity';
 
 @Module({
   imports: [
