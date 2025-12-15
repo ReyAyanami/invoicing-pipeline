@@ -35,7 +35,7 @@ This is a **study project** exploring:
 - Idempotent operations (safe retries)
 - Stream processing with Kafka
 
-**Not Production Ready** - This prioritizes learning billing semantics over scale.
+**Learning Project** - Focuses on usage metering, rating, and invoicing. Payment processing, tax calculation, and customer portals are out of scope.
 
 ## 📖 Documentation
 
