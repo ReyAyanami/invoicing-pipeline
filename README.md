@@ -39,14 +39,21 @@ This is a **study project** exploring:
 
 ## 📖 Documentation
 
-Start here:
+**Start here:**
 
-- [**📘 Project Philosophy**](docs/PROJECT_PHILOSOPHY.md) - Why these decisions?
-- [**🏛️ System Architecture**](docs/architecture/SYSTEM_ARCHITECTURE.md) - High-level design
-- [**⏰ Time Semantics**](docs/architecture/TIME_SEMANTICS.md) - Event-time vs processing-time
-- [**💰 Rating Engine**](docs/architecture/RATING_ENGINE.md) - Pricing and calculation
-- [**🔄 Re-rating & Corrections**](docs/architecture/RERATING.md) - Handling backfills
-- [**📊 Data Model**](docs/design/DATA_MODEL.md) - Entities and relationships
+- 👋 **New?** → [Getting Started Guide](docs/GETTING_STARTED.md)
+- 🤔 **Why?** → [Project Philosophy](docs/PROJECT_PHILOSOPHY.md)
+- 🏗️ **Architecture?** → [Visual Overview](docs/ARCHITECTURE_OVERVIEW.md)
+- 📚 **Everything?** → [Complete Index](docs/INDEX.md)
+
+**Core Architecture:**
+
+- [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) - Components and data flow
+- [Time Semantics](docs/architecture/TIME_SEMANTICS.md) ⚠️ Critical - Event-time concepts
+- [Rating Engine](docs/architecture/RATING_ENGINE.md) - Pricing models
+- [Re-rating & Corrections](docs/architecture/RERATING.md) - Handling adjustments
+- [Reconciliation](docs/architecture/RECONCILIATION.md) - Verification strategies
+- [Data Model](docs/design/DATA_MODEL.md) - Database schema
 
 ## 🚀 Quick Start
 

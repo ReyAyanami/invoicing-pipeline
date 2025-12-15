@@ -2,13 +2,23 @@
 
 Complete guide to the usage-based metering and invoicing pipeline.
 
+## 📊 Documentation Statistics
+
+- **Total Documents**: 17 markdown files
+- **Total Lines**: ~6,400 lines of documentation
+- **Topics Covered**: Architecture, Design, Implementation, Testing, Patterns
+- **Status**: Core documentation complete, API reference pending implementation
+
+---
+
 ## 🎯 Start Here
 
 **New to the project?**
 
 1. [README](../README.md) - Project overview
 2. [Project Philosophy](PROJECT_PHILOSOPHY.md) - Why these decisions?
-3. [Getting Started](GETTING_STARTED.md) - Run the system
+3. [Architecture Overview](ARCHITECTURE_OVERVIEW.md) - Visual guide with diagrams
+4. [Getting Started](GETTING_STARTED.md) - Run the system
 
 ---
 
@@ -57,8 +67,9 @@ Data models and detailed specifications.
 Guides for working with the codebase.
 
 - [**Getting Started**](GETTING_STARTED.md) - Setup and first steps
+- [**Testing Guide**](development/TESTING.md) - Unit, integration, E2E test strategies
+- [**Testability Analysis**](development/TESTABILITY_ANALYSIS.md) - How docs enable TDD
 - [**Development Workflow**](development/WORKFLOW.md) *(TODO)* - Day-to-day development
-- [**Testing Guide**](development/TESTING.md) *(TODO)* - Unit, integration, E2E tests
 - [**Debugging**](development/DEBUGGING.md) *(TODO)* - Troubleshooting techniques
 
 ---
@@ -89,13 +100,14 @@ Deep dives into specific topics.
 
 ## 🧪 Testing
 
-*(To be created during implementation)*
+Comprehensive testing strategy and patterns.
 
-- Unit Testing Patterns
-- Integration Test Setup
-- E2E Test Scenarios
-- Performance Testing
-- Chaos Engineering *(TODO)*
+- [**Testing Guide**](development/TESTING.md) - Complete test suite organization
+- [**Testability Analysis**](development/TESTABILITY_ANALYSIS.md) - Documentation assessment
+- Unit Testing Patterns (see Testing Guide)
+- Integration Test Setup (see Testing Guide)
+- E2E Test Scenarios (see Testing Guide)
+- Property-Based Testing (see Testing Guide)
 
 ---
 
@@ -210,6 +222,7 @@ Deep dives into specific topics.
 |----------|--------|--------------|
 | README | ✅ Complete | 2024-12-15 |
 | Project Philosophy | ✅ Complete | 2024-12-15 |
+| Architecture Overview | ✅ Complete | 2024-12-15 |
 | Getting Started | ✅ Complete | 2024-12-15 |
 | System Architecture | ✅ Complete | 2024-12-15 |
 | Time Semantics | ✅ Complete | 2024-12-15 |
@@ -217,10 +230,11 @@ Deep dives into specific topics.
 | Re-rating | ✅ Complete | 2024-12-15 |
 | Reconciliation | ✅ Complete | 2024-12-15 |
 | Data Model | ✅ Complete | 2024-12-15 |
+| Testing Guide | ✅ Complete | 2024-12-15 |
+| Testability Analysis | ✅ Complete | 2024-12-15 |
 | ADR-001 | ✅ Complete | 2024-12-15 |
 | ADR-002 | ✅ Complete | 2024-12-15 |
 | API Reference | 🚧 TODO | - |
-| Testing Guide | 🚧 TODO | - |
 | Workflow Guide | 🚧 TODO | - |
 
 ---
