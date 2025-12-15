@@ -51,14 +51,15 @@ Data models and detailed specifications.
 
 ## 🌐 API Reference
 
-*(To be created during implementation)*
+Documentation for REST API error handling and specifications.
 
-- REST API Overview
-- Event Ingestion Endpoints
-- Query Endpoints
-- Invoice Generation
-- Re-rating Operations
-- Explainability APIs
+- [**Error Codes & Handling**](api/ERROR_CODES.md) - HTTP status codes, retry strategies
+- REST API Overview *(TODO)*
+- Event Ingestion Endpoints *(TODO)*
+- Query Endpoints *(TODO)*
+- Invoice Generation *(TODO)*
+- Re-rating Operations *(TODO)*
+- Explainability APIs *(TODO)*
 
 ---
 
@@ -69,6 +70,7 @@ Guides for working with the codebase.
 - [**Getting Started**](GETTING_STARTED.md) - Setup and first steps
 - [**Testing Guide**](development/TESTING.md) - Unit, integration, E2E test strategies
 - [**Testability Analysis**](development/TESTABILITY_ANALYSIS.md) - How docs enable TDD
+- [**Performance Testing**](development/PERFORMANCE.md) - Load testing, concurrency scenarios
 - [**Development Workflow**](development/WORKFLOW.md) *(TODO)* - Day-to-day development
 - [**Debugging**](development/DEBUGGING.md) *(TODO)* - Troubleshooting techniques
 
@@ -232,6 +234,8 @@ Comprehensive testing strategy and patterns.
 | Data Model | ✅ Complete | 2024-12-15 |
 | Testing Guide | ✅ Complete | 2024-12-15 |
 | Testability Analysis | ✅ Complete | 2024-12-15 |
+| Performance Testing | ✅ Complete | 2024-12-15 |
+| Error Codes | ✅ Complete | 2024-12-15 |
 | ADR-001 | ✅ Complete | 2024-12-15 |
 | ADR-002 | ✅ Complete | 2024-12-15 |
 | API Reference | 🚧 TODO | - |
