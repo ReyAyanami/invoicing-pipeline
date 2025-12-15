@@ -7,19 +7,39 @@ Database schema for the usage-based metering and invoicing pipeline.
 **Critical**: Financial calculations require exact precision.
 
 - **Database**: Use `DECIMAL(p, s)` types, never `FLOAT` or `DOUBLE`
-- **Application**: Use `decimal.js` library, never native JavaScript `number` for calculations
+- **Application**: Use **branded Money/Quantity types** (built on `decimal.js`), never native JavaScript `number`
 - **API**: Accept/return strings for monetary values to avoid JSON precision loss
 
 ```typescript
-// ✅ Correct approach
+// ✅ Correct approach (recommended)
+import { Money, Quantity } from '@/common/types';
+const price = Money.from('10.99');
+const charge = Money.multiply(price, 1234); // Returns '13522.66' as Money
+
+// ✅ Also correct (lower-level)
 import { Decimal } from 'decimal.js';
 const charge = new Decimal('10.99').times('1234').toDecimalPlaces(2);
 
 // ❌ Wrong approach
-const charge = 10.99 * 1234;  // Floating point errors
+const charge = 10.99 * 1234;  // Floating point errors!
 ```
 
-See [Rating Engine - Rounding & Precision](../architecture/RATING_ENGINE.md#rounding--precision) for details.
+**Type Safety**: The `Money` and `Quantity` branded types prevent accidental use of arithmetic operators:
+
+```typescript
+const subtotal: Money = '100.00' as Money;
+const tax: Money = '10.00' as Money;
+
+// ❌ TypeScript compile error
+const total = subtotal + tax; // Operator '+' cannot be applied
+
+// ✅ Type-safe
+const total = Money.add(subtotal, tax); // '110.00' as Money
+```
+
+See:
+- [Money Type Safety Guide](../development/MONEY_TYPE_SAFETY.md) - Usage and migration
+- [Rating Engine - Precision](../architecture/RATING_ENGINE.md#rounding--precision) - Implementation details
 
 ---
 

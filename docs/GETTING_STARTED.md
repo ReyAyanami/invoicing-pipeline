@@ -45,7 +45,7 @@ This installs:
 - NestJS framework
 - TypeORM for database
 - KafkaJS for event streaming
-- Decimal.js for precise financial calculations
+- Decimal.js for precise financial calculations (via Money/Quantity types)
 - Testing libraries
 
 ---
@@ -58,8 +58,7 @@ npm run env:start
 
 This starts:
 - **PostgreSQL 14** on port 5432
-- **Kafka 3.x** on port 9092
-- **Zookeeper** on port 2181
+- **Kafka 3.9** (KRaft mode - no Zookeeper needed) on port 9092
 
 Wait ~30 seconds for services to be ready.
 

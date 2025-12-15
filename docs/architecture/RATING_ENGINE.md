@@ -8,6 +8,8 @@ The rating engine transforms **usage quantities** into **monetary charges** usin
 > Apply: Price of $0.02/call (effective on that date)  
 > Result: $24.68 charge with complete explainability
 
+> **Note**: This document uses `Decimal.js` examples for educational purposes. The actual implementation uses [Money and Quantity branded types](../development/MONEY_TYPE_SAFETY.md) which provide compile-time type safety on top of Decimal.js.
+
 ---
 
 ## Key Requirements
@@ -17,7 +19,13 @@ The rating engine transforms **usage quantities** into **monetary charges** usin
 **Same inputs → same outputs, always.**
 
 ```typescript
-// ✅ Deterministic
+// ✅ Deterministic (production approach)
+import { Money } from '@/common/types';
+function calculateCharge(quantity: number, unitPrice: Money): Money {
+  return Money.multiply(unitPrice, quantity); // Uses Decimal.js internally
+}
+
+// ✅ Deterministic (manual approach)
 function calculateCharge(quantity: number, unitPrice: number): number {
   return Math.round(quantity * unitPrice * 100) / 100; // Round to cents
 }
@@ -406,9 +414,39 @@ await saveRatedCharge(charge);
 0.1 + 0.2 === 0.3  // false (actually 0.30000000000000004)
 ```
 
-### Solution: Use Decimal.js
+### Solution: Use Money/Quantity Types
 
 **Recommended approach** for production systems:
+
+```typescript
+import { Money, Quantity } from '@/common/types';
+
+function calculateCharge(unitPrice: Money, quantity: number): Money {
+  return Money.multiply(unitPrice, quantity);
+}
+
+// Example
+const price = Money.from(0.02);
+const charge = calculateCharge(price, 1234);  // '24.68' as Money
+
+// Complex calculations
+const subtotal = Money.sum(['10.50', '33.30', '5.00']); // '48.80'
+const tax = Money.multiply(subtotal, 0.1);              // '4.88'
+const total = Money.add(subtotal, tax);                 // '53.68'
+```
+
+**Why Money types?**
+- ✅ **Compile-time type safety** - Can't use `+` or `-` operators
+- ✅ **No floating point errors** - Built on Decimal.js
+- ✅ **Self-documenting** - `Money` type shows intent
+- ✅ **IDE autocomplete** - All operations type-safe
+- ✅ **Zero runtime cost** - Types erased at compile time
+
+See [Money Type Safety Guide](../development/MONEY_TYPE_SAFETY.md) for complete documentation.
+
+### Alternative: Direct Decimal.js Usage
+
+For lower-level operations or when Money types aren't applicable:
 
 ```typescript
 import { Decimal } from 'decimal.js';
@@ -425,20 +463,7 @@ function calculateCharge(unitPrice: number, quantity: number): number {
 
 // Example
 calculateCharge(0.02, 1234);  // $24.68 (exact)
-
-// Complex calculations
-const total = new Decimal('10.5')
-  .times('3.33')
-  .plus('5.00')
-  .toDecimalPlaces(2);  // 39.97
 ```
-
-**Why Decimal.js?**
-- ✅ Arbitrary precision arithmetic
-- ✅ No floating point errors
-- ✅ Industry standard for financial calculations
-- ✅ Explicit rounding control
-- ✅ Chainable operations
 
 **Installation**:
 ```bash

@@ -71,6 +71,9 @@ Guides for working with the codebase.
 - [**Testing Guide**](development/TESTING.md) - Unit, integration, E2E test strategies
 - [**Testability Analysis**](development/TESTABILITY_ANALYSIS.md) - How docs enable TDD
 - [**Performance Testing**](development/PERFORMANCE.md) - Load testing, concurrency scenarios
+- [**Money Type Safety**](development/MONEY_TYPE_SAFETY.md) - Type-safe monetary calculations
+- [**Money Enforcement Strategies**](development/MONEY_ENFORCEMENT_STRATEGIES.md) - Comparison of approaches
+- [**Type-Safe Queries**](development/TYPE_SAFE_QUERIES.md) - Database query type safety
 - [**Development Workflow**](development/WORKFLOW.md) *(TODO)* - Day-to-day development
 - [**Debugging**](development/DEBUGGING.md) *(TODO)* - Troubleshooting techniques
 
@@ -222,20 +225,23 @@ Comprehensive testing strategy and patterns.
 
 | Document | Status | Last Updated |
 |----------|--------|--------------|
-| README | ✅ Complete | 2024-12-15 |
+| README | ✅ Complete | 2024-12-16 |
 | Project Philosophy | ✅ Complete | 2024-12-15 |
 | Architecture Overview | ✅ Complete | 2024-12-15 |
-| Getting Started | ✅ Complete | 2024-12-15 |
+| Getting Started | ✅ Complete | 2024-12-16 |
 | System Architecture | ✅ Complete | 2024-12-15 |
 | Time Semantics | ✅ Complete | 2024-12-15 |
-| Rating Engine | ✅ Complete | 2024-12-15 |
+| Rating Engine | ✅ Complete | 2024-12-16 |
 | Re-rating | ✅ Complete | 2024-12-15 |
 | Reconciliation | ✅ Complete | 2024-12-15 |
-| Data Model | ✅ Complete | 2024-12-15 |
+| Data Model | ✅ Complete | 2024-12-16 |
 | Testing Guide | ✅ Complete | 2024-12-15 |
 | Testability Analysis | ✅ Complete | 2024-12-15 |
 | Performance Testing | ✅ Complete | 2024-12-15 |
 | Error Codes | ✅ Complete | 2024-12-15 |
+| Money Type Safety | ✅ Complete | 2024-12-16 |
+| Money Enforcement | ✅ Complete | 2024-12-16 |
+| Type-Safe Queries | ✅ Complete | 2024-12-16 |
 | ADR-001 | ✅ Complete | 2024-12-15 |
 | ADR-002 | ✅ Complete | 2024-12-15 |
 | API Reference | 🚧 TODO | - |
@@ -249,6 +255,7 @@ Comprehensive testing strategy and patterns.
 
 - **Event-time handling?** → [Time Semantics](architecture/TIME_SEMANTICS.md)
 - **Pricing logic?** → [Rating Engine](architecture/RATING_ENGINE.md)
+- **Type-safe money calculations?** → [Money Type Safety](development/MONEY_TYPE_SAFETY.md)
 - **Fixing past invoices?** → [Re-rating](architecture/RERATING.md)
 - **Database schema?** → [Data Model](design/DATA_MODEL.md)
 - **Setup instructions?** → [Getting Started](GETTING_STARTED.md)
