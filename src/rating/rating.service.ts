@@ -174,11 +174,6 @@ export class RatingService {
 
   /**
    * Find all rated charges for a customer in a date range
-   *
-   * ✅ TYPE-SAFE VERSION: Using find() with typed operators
-   * - Field names are compile-time checked against RatedCharge entity
-   * - TypeScript will error if customerId or createdAt don't exist
-   * - Between() is a type-safe operator for range queries
    */
   async findChargesForPeriod(
     customerId: string,
@@ -187,10 +182,10 @@ export class RatingService {
   ): Promise<RatedCharge[]> {
     return this.ratedChargeRepository.find({
       where: {
-        customerId, // ✅ Compile-time type-checked
-        createdAt: Between(startDate, endDate), // ✅ Type-safe range operator
+        customerId,
+        createdAt: Between(startDate, endDate),
       },
-      order: { createdAt: 'ASC' }, // ✅ Compile-time type-checked
+      order: { createdAt: 'ASC' },
     });
   }
 }

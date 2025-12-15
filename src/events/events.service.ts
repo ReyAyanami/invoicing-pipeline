@@ -68,30 +68,25 @@ export class EventsService {
 
   /**
    * Find telemetry events with optional filters
-   *
-   * ✅ TYPE-SAFE VERSION: Using find() with conditional where object
-   * - Field names are compile-time checked against TelemetryEvent entity
-   * - TypeScript will error if customerId or eventType don't exist
    */
   async findAll(
     customerId?: string,
     eventType?: string,
     limit = 100,
   ): Promise<TelemetryEvent[]> {
-    // Build type-safe where clause conditionally
     const where: FindOptionsWhere<TelemetryEvent> = {};
 
     if (customerId) {
-      where.customerId = customerId; // ✅ Type-checked
+      where.customerId = customerId;
     }
 
     if (eventType) {
-      where.eventType = eventType; // ✅ Type-checked
+      where.eventType = eventType;
     }
 
     return this.telemetryEventRepository.find({
       where,
-      order: { eventTime: 'DESC' }, // ✅ Type-checked
+      order: { eventTime: 'DESC' },
       take: limit,
     });
   }
