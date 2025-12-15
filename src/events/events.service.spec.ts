@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventsService } from './events.service';
-import { TelemetryEvent } from '../entities/telemetry-event.entity';
+import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 
 describe('EventsService', () => {

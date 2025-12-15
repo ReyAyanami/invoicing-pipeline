@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelemetryEvent } from '../entities/telemetry-event.entity';
+import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 
 @Injectable()

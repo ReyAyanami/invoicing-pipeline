@@ -1,17 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
+import { HealthModule } from '../../src/health/health.module';
 
-describe('AppController (e2e)', () => {
+describe('Health (e2e)', () => {
   let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [HealthModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
     await app.init();
   });
 
@@ -26,5 +27,7 @@ describe('AppController (e2e)', () => {
 
     expect(response.body).toHaveProperty('status', 'ok');
     expect(response.body).toHaveProperty('service', 'invoicing-pipeline');
+    expect(response.body).toHaveProperty('version', '0.0.1');
+    expect(response.body).toHaveProperty('timestamp');
   });
 });

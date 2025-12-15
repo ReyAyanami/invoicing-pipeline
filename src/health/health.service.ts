@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class AppService {
-  getHealth(): Record<string, any> {
+export class HealthService {
+  check() {
     return {
       status: 'ok',
       service: 'invoicing-pipeline',

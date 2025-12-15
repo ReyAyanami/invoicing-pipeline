@@ -10,7 +10,7 @@ import {
   RatedCharge,
   Invoice,
   InvoiceLineItem,
-} from '../entities';
+} from './entities';
 
 @Module({
   imports: [
