@@ -28,14 +28,14 @@ Build a system that ingests telemetry events, aggregates by event-time windows, 
 
 This is a **study project** exploring:
 
-- Stream processing semantics (Kafka Streams / Flink-style thinking)
-- Event sourcing for auditability
-- CQRS for read/write separation
-- Immutable data structures
-- Idempotent operations
-- Event-time windowing with watermarks
+- Event-time windowing with watermarks (the hard part of usage billing)
+- Late arrival handling and out-of-order events
+- Event sourcing for complete audit trails
+- Immutable data structures (append-only, never update)
+- Idempotent operations (safe retries)
+- Stream processing with Kafka
 
-**Not Production Ready** - This prioritizes learning over robustness.
+**Not Production Ready** - This prioritizes learning billing semantics over scale.
 
 ## 📖 Documentation
 

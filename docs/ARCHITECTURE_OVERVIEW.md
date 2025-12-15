@@ -539,7 +539,7 @@ After building this, you'll understand:
 - **AWS Cost Explorer**: Cloud usage billing
 - **Apache Kafka Streams**: Stream processing patterns
 - **Event Sourcing**: Greg Young's work
-- **CQRS**: Martin Fowler's writings
+- **Apache Flink**: Event-time processing concepts
 
 ---
 

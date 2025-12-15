@@ -318,24 +318,6 @@ interface LineItem {
 
 ---
 
-### CQRS (Command Query Responsibility Segregation)
-
-**Separate write and read models.**
-
-**Write Side** (Commands):
-- Ingest telemetry
-- Compute aggregations
-- Calculate charges
-
-**Read Side** (Queries):
-- Invoice dashboard
-- Customer portal
-- Analytics/reporting
-
-**Projection**: Async read model updates from event streams
-
----
-
 ### Idempotency
 
 **Processing same event twice = same result.**

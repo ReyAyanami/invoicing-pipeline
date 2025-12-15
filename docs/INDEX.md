@@ -95,7 +95,7 @@ Deep dives into specific topics.
 ### Data Engineering
 - Partitioning strategies
 - Event sourcing patterns
-- CQRS implementation
+- Stream processing pipelines
 - Idempotency guarantees
 
 ---
@@ -138,9 +138,9 @@ Comprehensive testing strategy and patterns.
 - [AWS Cost & Usage Report](https://aws.amazon.com/aws-cost-management/aws-cost-and-usage-reporting/)
 - [Zuora Documentation](https://www.zuora.com/developer/)
 
-**Event Sourcing**
+**Event Sourcing & Streaming**
 - [Event Sourcing - Greg Young](https://www.eventstore.com/blog/what-is-event-sourcing)
-- [CQRS Pattern](https://martinfowler.com/bliki/CQRS.html) - Martin Fowler
+- [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) - Martin Fowler
 
 **Technologies**
 - [NestJS Documentation](https://docs.nestjs.com)

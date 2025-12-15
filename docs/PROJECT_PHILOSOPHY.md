@@ -157,9 +157,9 @@ Single currency (USD). FX rates add significant complexity.
 
 ### Architectural Patterns
 - **Event Sourcing** - Complete audit trail
-- **CQRS** - Separate write (commands) and read (queries) models
 - **Stream Processing** - Kafka Streams / Flink semantics
 - **Idempotency** - Same event processed twice = same result
+- **Pipeline Separation** - Clear stages with defined inputs/outputs
 - **Saga Pattern** - Multi-step workflows with compensation
 
 ---
