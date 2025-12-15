@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
+import { KafkaService } from '../kafka/kafka.service';
+import { KAFKA_TOPICS } from '../kafka/constants';
 
 @Injectable()
 export class EventsService {
@@ -11,6 +13,7 @@ export class EventsService {
   constructor(
     @InjectRepository(TelemetryEvent)
     private readonly telemetryEventRepository: Repository<TelemetryEvent>,
+    private readonly kafkaService: KafkaService,
   ) {}
 
   async ingest(createEventDto: CreateEventDto): Promise<TelemetryEvent> {
@@ -38,6 +41,27 @@ export class EventsService {
 
     const saved = await this.telemetryEventRepository.save(event);
     this.logger.log(`Ingested event: ${saved.event_id}`);
+
+    // Publish to Kafka for downstream processing
+    try {
+      await this.kafkaService.sendMessage(KAFKA_TOPICS.TELEMETRY_EVENTS, {
+        event_id: saved.event_id,
+        event_type: saved.event_type,
+        customer_id: saved.customer_id,
+        event_time: saved.event_time.toISOString(),
+        ingestion_time: saved.ingestion_time.toISOString(),
+        metadata: saved.metadata,
+        source: saved.source,
+      });
+      this.logger.debug(`Event published to Kafka: ${saved.event_id}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish event to Kafka: ${saved.event_id}`,
+        error,
+      );
+      // Don't fail the request if Kafka publish fails
+      // Event is already persisted to database
+    }
 
     return saved;
   }

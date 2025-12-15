@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventsService } from './events.service';
 import { TelemetryEvent } from '../database/entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
+import { KafkaService } from '../kafka/kafka.service';
 
 describe('EventsService', () => {
   let service: EventsService;
@@ -15,6 +16,10 @@ describe('EventsService', () => {
     createQueryBuilder: jest.fn(),
   };
 
+  const mockKafkaService = {
+    sendMessage: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -22,6 +27,10 @@ describe('EventsService', () => {
         {
           provide: getRepositoryToken(TelemetryEvent),
           useValue: mockRepository,
+        },
+        {
+          provide: KafkaService,
+          useValue: mockKafkaService,
         },
       ],
     }).compile();
@@ -50,9 +59,11 @@ describe('EventsService', () => {
       mockRepository.create.mockReturnValue(createEventDto);
       mockRepository.save.mockResolvedValue({
         ...createEventDto,
+        event_time: new Date(createEventDto.event_time),
         ingestion_time: new Date(),
         created_at: new Date(),
       });
+      mockKafkaService.sendMessage.mockResolvedValue(undefined);
 
       const result = await service.ingest(createEventDto);
 
@@ -61,6 +72,7 @@ describe('EventsService', () => {
       });
       expect(mockRepository.create).toHaveBeenCalled();
       expect(mockRepository.save).toHaveBeenCalled();
+      expect(mockKafkaService.sendMessage).toHaveBeenCalled();
       expect(result.event_id).toBe(createEventDto.event_id);
     });
 
@@ -90,11 +102,13 @@ describe('EventsService', () => {
       mockRepository.create.mockReturnValue(minimalDto);
       mockRepository.save.mockResolvedValue({
         ...minimalDto,
+        event_time: new Date(minimalDto.event_time),
         metadata: {},
         source: null,
         ingestion_time: new Date(),
         created_at: new Date(),
       });
+      mockKafkaService.sendMessage.mockResolvedValue(undefined);
 
       const result = await service.ingest(minimalDto);
 
@@ -105,6 +119,7 @@ describe('EventsService', () => {
           source: null,
         }),
       );
+      expect(mockKafkaService.sendMessage).toHaveBeenCalled();
     });
   });
 

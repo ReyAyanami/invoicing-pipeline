@@ -27,9 +27,10 @@
     "env:clean": "docker compose down -v",
     "env:status": "docker compose ps",
     "env:logs": "docker compose logs -f",
-    "migration:generate": "typeorm migration:generate",
-    "migration:run": "typeorm migration:run",
-    "migration:revert": "typeorm migration:revert",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
     "prepare": "husky"
   },
   "dependencies": {
