@@ -11,6 +11,7 @@ describe('EventsService', () => {
 
   const mockRepository = {
     findOne: jest.fn(),
+    find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     createQueryBuilder: jest.fn(),
@@ -127,20 +128,13 @@ describe('EventsService', () => {
     it('should return events with filters', async () => {
       const mockEvents = [
         {
-          event_id: '123e4567-e89b-12d3-a456-426614174000',
-          event_type: 'api_call',
-          customer_id: '123e4567-e89b-12d3-a456-426614174001',
+          eventId: '123e4567-e89b-12d3-a456-426614174000',
+          eventType: 'api_call',
+          customerId: '123e4567-e89b-12d3-a456-426614174001',
         },
       ];
 
-      const mockQueryBuilder = {
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockEvents),
-      };
-
-      mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockRepository.find.mockResolvedValue(mockEvents);
 
       const result = await service.findAll(
         '123e4567-e89b-12d3-a456-426614174001',
@@ -149,31 +143,33 @@ describe('EventsService', () => {
       );
 
       expect(result).toEqual(mockEvents);
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(2);
-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(50);
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: {
+          customerId: '123e4567-e89b-12d3-a456-426614174001',
+          eventType: 'api_call',
+        },
+        order: { eventTime: 'DESC' },
+        take: 50,
+      });
     });
 
     it('should return events without filters', async () => {
       const mockEvents = [
         {
-          event_id: '123e4567-e89b-12d3-a456-426614174000',
+          eventId: '123e4567-e89b-12d3-a456-426614174000',
         },
       ];
 
-      const mockQueryBuilder = {
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockEvents),
-      };
-
-      mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockRepository.find.mockResolvedValue(mockEvents);
 
       const result = await service.findAll();
 
       expect(result).toEqual(mockEvents);
-      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(100);
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: {},
+        order: { eventTime: 'DESC' },
+        take: 100,
+      });
     });
   });
 

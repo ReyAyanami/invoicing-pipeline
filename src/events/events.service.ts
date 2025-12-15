@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { TelemetryEvent } from './entities/telemetry-event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { KafkaService } from '../kafka/kafka.service';
@@ -66,22 +66,34 @@ export class EventsService {
     return saved;
   }
 
+  /**
+   * Find telemetry events with optional filters
+   *
+   * ✅ TYPE-SAFE VERSION: Using find() with conditional where object
+   * - Field names are compile-time checked against TelemetryEvent entity
+   * - TypeScript will error if customerId or eventType don't exist
+   */
   async findAll(
     customerId?: string,
     eventType?: string,
     limit = 100,
   ): Promise<TelemetryEvent[]> {
-    const query = this.telemetryEventRepository.createQueryBuilder('event');
+    // Build type-safe where clause conditionally
+    const where: FindOptionsWhere<TelemetryEvent> = {};
 
     if (customerId) {
-      query.andWhere('event.customerId = :customerId', { customerId });
+      where.customerId = customerId; // ✅ Type-checked
     }
 
     if (eventType) {
-      query.andWhere('event.eventType = :eventType', { eventType });
+      where.eventType = eventType; // ✅ Type-checked
     }
 
-    return query.orderBy('event.eventTime', 'DESC').limit(limit).getMany();
+    return this.telemetryEventRepository.find({
+      where,
+      order: { eventTime: 'DESC' }, // ✅ Type-checked
+      take: limit,
+    });
   }
 
   async findOne(eventId: string): Promise<TelemetryEvent | null> {

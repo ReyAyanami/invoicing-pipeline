@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import Decimal from 'decimal.js';
 import { RatedCharge } from './entities/rated-charge.entity';
 import { AggregatedUsage } from '../aggregation/entities/aggregated-usage.entity';
@@ -174,18 +174,23 @@ export class RatingService {
 
   /**
    * Find all rated charges for a customer in a date range
+   *
+   * ✅ TYPE-SAFE VERSION: Using find() with typed operators
+   * - Field names are compile-time checked against RatedCharge entity
+   * - TypeScript will error if customerId or createdAt don't exist
+   * - Between() is a type-safe operator for range queries
    */
   async findChargesForPeriod(
     customerId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<RatedCharge[]> {
-    return this.ratedChargeRepository
-      .createQueryBuilder('rated_charge')
-      .where('rated_charge.customerId = :customerId', { customerId })
-      .andWhere('rated_charge.createdAt >= :startDate', { startDate })
-      .andWhere('rated_charge.createdAt < :endDate', { endDate })
-      .orderBy('rated_charge.createdAt', 'ASC')
-      .getMany();
+    return this.ratedChargeRepository.find({
+      where: {
+        customerId, // ✅ Compile-time type-checked
+        createdAt: Between(startDate, endDate), // ✅ Type-safe range operator
+      },
+      order: { createdAt: 'ASC' }, // ✅ Compile-time type-checked
+    });
   }
 }
