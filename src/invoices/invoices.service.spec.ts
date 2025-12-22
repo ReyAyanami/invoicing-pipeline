@@ -64,6 +64,67 @@ describe('InvoicesService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('generateInvoice', () => {
+    it('should generate an invoice and group charges by metric type', async () => {
+      const dto = {
+        customerId: 'customer-123',
+        periodStart: '2024-01-01',
+        periodEnd: '2024-01-31',
+      };
+
+      const charges = [
+        {
+          chargeId: 'charge-1',
+          subtotal: '50.00',
+          quantity: '1000',
+          rule: { metricType: 'api_calls', unit: 'requests' },
+        },
+        {
+          chargeId: 'charge-2',
+          subtotal: '25.00',
+          quantity: '500',
+          rule: { metricType: 'api_calls', unit: 'requests' },
+        },
+        {
+          chargeId: 'charge-3',
+          subtotal: '40.00',
+          quantity: '100',
+          rule: { metricType: 'storage', unit: 'GB' },
+        },
+      ];
+
+      mockCustomersService.findOne.mockResolvedValue({ id: 'customer-123' });
+      mockRatingService.findChargesForPeriod.mockResolvedValue(charges);
+      mockInvoiceRepository.create.mockImplementation((arg) => ({
+        ...arg,
+        invoiceId: 'inv-123',
+      }));
+      mockInvoiceRepository.save.mockImplementation((arg) => arg);
+      mockLineItemRepository.create.mockImplementation((arg) => arg);
+      mockLineItemRepository.save.mockImplementation((arg) => arg);
+      mockInvoiceRepository.findOne.mockResolvedValue({
+        invoiceId: 'inv-123',
+        lineItems: [
+          { metricType: 'api_calls', amount: '75.00', quantity: '1500' },
+          { metricType: 'storage', amount: '40.00', quantity: '100' },
+        ],
+      });
+
+      const result = await service.generateInvoice(dto);
+
+      expect(result).toBeDefined();
+      expect(mockLineItemRepository.create).toHaveBeenCalledTimes(2); // Two unique metrics
+      expect(mockLineItemRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metricType: 'api_calls',
+          description: 'Api Calls usage',
+          amount: '75.00',
+          quantity: '1500.000000', // Quantity might be formatted too
+        }),
+      );
+    });
+  });
+
   describe('findOne', () => {
     it('should return an invoice with line items', async () => {
       const invoice = {

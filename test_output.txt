@@ -1,0 +1,52 @@
+
+> invoicing-pipeline@0.0.1 test
+> jest "src/rating/rating.service.spec.ts"
+
+FAIL src/rating/rating.service.spec.ts
+  RatingService
+    ΓêÜ should be defined (9 ms)
+    rateUsage
+      ΓêÜ should rate usage with per_unit pricing (3 ms)
+      ├ù should rate usage with tiered pricing (4 ms)
+      ├ù should rate usage with volume pricing (2 ms)
+      ΓêÜ should throw NotFoundException if no price book found (6 ms)
+
+  ΓùÅ RatingService ΓÇ║ rateUsage ΓÇ║ should rate usage with tiered pricing
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "110"
+    Received: "110.00"
+
+      139 |       const result = await service.rateUsage(rateDto);
+      140 |
+    > 141 |       expect(result.subtotal.toString()).toBe('110'); // 100 + 10
+          |                                          ^
+      142 |       expect(result.calculationMetadata.model).toBe('tiered');
+      143 |       expect(result.calculationMetadata.tiersApplied).toHaveLength(2);
+      144 |       expect(result.calculationMetadata.tiersApplied![0].charge).toBe('100');
+
+      at Object.<anonymous> (src/rating/rating.service.spec.ts:141:42)
+
+  ΓùÅ RatingService ΓÇ║ rateUsage ΓÇ║ should rate usage with volume pricing
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "400"
+    Received: "400.00"
+
+      180 |       const result = await service.rateUsage(rateDto);
+      181 |
+    > 182 |       expect(result.subtotal.toString()).toBe('400'); // 5000 * 0.08
+          |                                          ^
+      183 |       expect(result.calculationMetadata.model).toBe('volume');
+      184 |       expect(result.calculationMetadata.unitPrice).toBe('0.08');
+      185 |     });
+
+      at Object.<anonymous> (src/rating/rating.service.spec.ts:182:42)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 3 passed, 5 total
+Snapshots:   0 total
+Time:        2.793 s, estimated 3 s
+Ran all test suites matching /src\\rating\\rating.service.spec.ts/i.

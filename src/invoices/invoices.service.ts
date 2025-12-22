@@ -31,7 +31,7 @@ export class InvoicesService {
     private readonly lineItemRepository: Repository<InvoiceLineItem>,
     private readonly ratingService: RatingService,
     private readonly customersService: CustomersService,
-  ) {}
+  ) { }
 
   /**
    * Generate an invoice for a customer and period
@@ -104,9 +104,7 @@ export class InvoicesService {
     const grouped = new Map<string, typeof charges>();
 
     for (const charge of charges) {
-      // RatedCharge doesn't have metricType directly, would need to join with aggregation
-      // For now, use a placeholder
-      const key = 'usage';
+      const key = charge.rule?.metricType ?? 'unknown';
       if (!grouped.has(key)) {
         grouped.set(key, []);
       }
@@ -139,10 +137,10 @@ export class InvoicesService {
       const lineItem = this.lineItemRepository.create({
         invoiceId,
         lineNumber: lineNumber++,
-        description: `${metricType} usage`,
+        description: `${this.formatMetricName(metricType)} usage`,
         metricType,
         quantity,
-        unit: 'units',
+        unit: charges[0]?.rule?.unit ?? 'units',
         unitPrice,
         amount,
         chargeIds: charges.map((c) => c.chargeId),
@@ -198,5 +196,12 @@ export class InvoicesService {
     this.logger.log(`Issued invoice ${id}`);
 
     return invoice;
+  }
+
+  private formatMetricName(metricType: string): string {
+    return metricType
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 }
