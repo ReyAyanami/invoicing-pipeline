@@ -8,12 +8,12 @@ Build a system that ingests telemetry events, aggregates by event-time windows, 
 
 ### Core Capabilities
 
-1. **Event Ingestion** - Consume high-volume telemetry events from multiple sources
-2. **Time-Window Aggregation** - Event-time windowing with late arrival handling
-3. **Rating Engine** - Apply immutable price books with effective dating
-4. **Invoice Generation** - Produce invoices with line-item explainability
-5. **Re-rating & Corrections** - Handle backfills and adjustments deterministically
-6. **Reconciliation** - Ledger tie-out and audit trails
+1. **Event Ingestion** - Consume high-volume telemetry events from Kafka
+2. **Time-Window Aggregation** - Precise event-time windowing with late arrival detection
+3. **Rating Engine** - Multi-tiered pricing rules with deterministic high-precision math
+4. **Automated Billing** - Dynamic tax calculation (regional), customer credits, and multi-currency
+5. **Re-rating & Corrections** - Automated late-event handling and delta-invoice generation
+6. **Explainability** - Auditable trail from raw event to invoice line item
 
 ### Hard Problems We're Solving
 
@@ -35,7 +35,7 @@ This is a **study project** exploring:
 - Idempotent operations (safe retries)
 - Stream processing with Kafka
 
-**Learning Project** - Focuses on usage metering, rating, and invoicing. Payment processing, tax calculation, and customer portals are out of scope.
+**Learning Project** - Focuses on usage metering, rating, and invoicing. Full payment gateway integration and complex customer portals are out of scope. Built-in tax logic, credit management, and re-rating are fully supported.
 
 ## 📖 Documentation
 

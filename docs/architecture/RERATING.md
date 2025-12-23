@@ -39,22 +39,22 @@ Investigation: They're right. Telemetry bug. Need to issue credits.
 
 ## Re-rating Triggers
 
-### 1. Late Events (Automatic)
+### 1. Late Events (Automated)
 
-Event arrives after allowed lateness window closed.
+Instead of dropping late events, the system routes them to a specialized re-rating pipeline.
 
-**Detection**:
+**Detection & Routing**:
 ```typescript
-if (event.event_time < currentWatermark - allowedLateness) {
-  // Window already closed and finalized
-  triggerRerating(event);
+if (eventTime < currentWatermark) {
+  // Event arrived after its window was already finalized
+  await this.kafkaService.sendMessage(KAFKA_TOPICS.LATE_EVENTS, event);
 }
 ```
 
-**Policy**: Depends on volume and timing
-- Single late event: May absorb cost (customer goodwill)
-- Bulk late events: Re-rate automatically
-- Post-invoice late events: Case-by-case
+**Policy**: Every late event that arrives after its processing window has closed is treated as a delta.
+- **Micro-adjustment**: The event is rated individually.
+- **Zero OHD**: No need to re-open historical aggregation windows.
+- **Delta Charge**: A new `RatedCharge` is created specifically for this event.
 
 ---
 
@@ -108,160 +108,33 @@ Lost data recovered from backup. Need to process historical events.
 
 ---
 
-## Re-rating Process
+## The Automated Correction Flow
 
-### Step 1: Identify Scope
+Our implementation prioritizes automation. When a late event is processed, it creates a new charge. The `InvoicesService` then handles the "Correctness under correction" logic.
 
-Define what to re-rate:
+### 1. Late Event Detection
+The `AggregationService` detects late events (event-time < watermark) and emits them to `telemetry-events-late`.
 
-```typescript
-interface ReratingJob {
-  job_id: string;
-  triggered_by: 'late_events' | 'bug_fix' | 'dispute' | 'backfill';
-  reason: string;
-  
-  // Scope
-  customer_ids: string[] | null;  // null = all customers
-  metric_types: string[];
-  window_start: Date;
-  window_end: Date;
-  
-  // Price book to use
-  price_book_id: string;
-  price_version: string;
-  
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  created_at: Date;
-}
-```
+### 2. Reactive Re-rating
+The `ReRatingService` consumes the late events topic and triggers `RatingService.rateUsage()` for each event. This creates a new `RatedCharge` in the database.
 
----
+### 3. Delta-Invoice Generation
+When `generateInvoice` is called (e.g., at the end of the month or on-demand):
 
-### Step 2: Re-aggregate Events
-
-Pull raw events from event store and re-compute aggregations.
+1. **Issued Check**: The system checks if an `issued` or `paid` invoice already exists for the same period.
+2. **Correction Mode**: If an issued invoice exists, the system enters "Correction Mode".
+3. **Delta Selection**: It selects only charges calculated *after* the previous invoice's issuance.
+4. **Correction Document**: A new invoice (type: `correction`) is generated containing only these delta charges.
+5. **Traceability**: The correction invoice points back to the original via `referenceInvoiceId`.
 
 ```typescript
-async function reaggregateEvents(job: ReratingJob): Promise<AggregatedUsage[]> {
-  const events = await eventStore.queryEvents({
-    customer_ids: job.customer_ids,
-    metric_types: job.metric_types,
-    event_time_start: job.window_start,
-    event_time_end: job.window_end
-  });
-  
-  // Group by customer + metric + window
-  const windows = groupEventsIntoWindows(events, {
-    window_size: Duration.hours(1)
-  });
-  
-  const aggregations: AggregatedUsage[] = [];
-  
-  for (const window of windows) {
-    aggregations.push({
-      aggregation_id: generateUUID(),
-      customer_id: window.customer_id,
-      metric_type: window.metric_type,
-      window_start: window.start,
-      window_end: window.end,
-      value: window.events.length,  // Or sum, avg, etc.
-      unit: window.unit,
-      event_ids: window.events.map(e => e.event_id),
-      event_count: window.events.length,
-      computed_at: new Date(),
-      is_final: true,
-      rerating_job_id: job.job_id  // Mark as re-rated
-    });
-  }
-  
-  return aggregations;
-}
-```
-
-**Key**: Use same windowing logic as original metering.
-
----
-
-### Step 3: Re-apply Rating
-
-Calculate charges with (possibly) new price book or fixed logic.
-
-```typescript
-async function rerateAggregations(
-  aggregations: AggregatedUsage[],
-  job: ReratingJob
-): Promise<RatedCharge[]> {
-  const priceBook = await getPriceBook(
-    job.price_book_id,
-    job.price_version
-  );
-  
-  const charges: RatedCharge[] = [];
-  
-  for (const agg of aggregations) {
-    const charge = await calculateCharge(agg, priceBook);
-    charge.rerating_job_id = job.job_id;  // Mark as re-rated
-    charges.push(charge);
-  }
-  
-  return charges;
-}
-```
-
----
-
-### Step 4: Generate Correction Invoice
-
-Compare new charges to original charges.
-
-```typescript
-async function generateCorrectionInvoice(
-  customer_id: string,
-  original_charges: RatedCharge[],
-  rerated_charges: RatedCharge[]
-): Promise<CorrectionInvoice> {
-  const corrections: LineItem[] = [];
-  
-  for (const rerated of rerated_charges) {
-    const original = original_charges.find(
-      c => c.aggregation_id === rerated.aggregation_id
-    );
-    
-    if (!original) {
-      // New charge (late event)
-      corrections.push({
-        description: `Additional ${rerated.metric_type}`,
-        amount: rerated.subtotal,
-        type: 'charge'
-      });
-    } else if (rerated.subtotal !== original.subtotal) {
-      // Different charge
-      const diff = rerated.subtotal - original.subtotal;
-      corrections.push({
-        description: `Adjustment to ${rerated.metric_type}`,
-        original_amount: original.subtotal,
-        corrected_amount: rerated.subtotal,
-        difference: diff,
-        type: diff > 0 ? 'charge' : 'credit'
-      });
-    }
-  }
-  
-  const total_adjustment = corrections.reduce(
-    (sum, item) => sum + (item.difference || item.amount),
-    0
-  );
-  
-  return {
-    invoice_id: generateUUID(),
-    invoice_type: 'correction',
-    customer_id,
-    reference_invoice_id: original_invoice.invoice_id,
-    line_items: corrections,
-    total_adjustment,
-    reason: job.reason,
-    issued_at: new Date()
-  };
+// InvoicesService logic
+if (issuedInvoice) {
+  isCorrection = true;
+  referenceInvoiceId = issuedInvoice.invoiceId;
+  const allCharges = await this.ratingService.findChargesForPeriod(customerId, start, end);
+  // Only include charges that came in after we issued the last invoice
+  charges = allCharges.filter(c => c.calculatedAt > issuedInvoice.issuedAt);
 }
 ```
 

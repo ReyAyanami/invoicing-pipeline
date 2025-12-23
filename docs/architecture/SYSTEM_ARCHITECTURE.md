@@ -51,31 +51,31 @@
                     └────────┬────────┘
                              │
                              ▼
-                    ┌────────────────┐
-                    │INVOICE GENERATOR│
-                    │                 │
-                    │ • Group by      │
-                    │   Customer      │
-                    │ • Apply Credits │
-                    │ • Format Output │
-                    │ • Send          │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌────────────────┐
-                    │    INVOICES     │
-                    │  (Read Model)   │
-                    └─────────────────┘
+                              │
+                              ▼
+                     ┌────────────────┐     ┌────────────────┐
+                     │INVOICE GENERATOR│◄────│ LATE EVENTS    │
+                     │                 │     │ (Kafka Topic)  │
+                     │ • Issued Check  │     └───────┬────────┘
+                     │ • Correction    │             │
+                     │   Mode          │             ▼
+                     │ • Delta Selection│     ┌────────────────┐
+                     └────────┬────────┘     │ RE-RATING SRVC │
+                              │              │                │
+                              ▼              │ • Reactive     │
+                     ┌────────────────┐      │ • Delta Rating │
+                     │    INVOICES     │◄─────┤ • Charge Emit  │
+                     │ (Correction/Std)│      └────────────────┘
+                     └─────────────────┘
 
           ┌──────────────────────────────┐
           │    RE-RATING WORKFLOW        │
           │                              │
-          │  1. Trigger re-rate          │
-          │  2. Rewind watermark         │
-          │  3. Re-aggregate events      │
-          │  4. Re-apply pricing         │
-          │  5. Generate correction      │
-          │     invoice                  │
+          │  1. Late event arrives       │
+          │  2. Re-aggregate events      │
+          │  3. Re-rate affected period  │
+          │  4. Generate delta charges   │
+          │  5. Issue correction invoice │
           └──────────────────────────────┘
 ```
 
@@ -280,22 +280,20 @@ interface LineItem {
 ### Unhappy Path: Late Event
 
 1. **T0: Event Occurs** at `2024-01-15 23:59:00`
-2. **T1 = T0+2h: Event Arrives** (system was down)
-   - Ingestion time is `2024-01-16 01:59:00`
+2. **T1 = T0+2h: Event Arrives** (delayed source)
    - Event-time is `2024-01-15 23:59:00`
+   - Watermark has already passed `23:59:00`
 3. **Metering Engine**:
-   - Checks: is window still open?
-   - Watermark is at `2024-01-16 00:30:00`
-   - Allowed lateness: 3 hours
-   - Window `[2024-01-15 23:00:00, 2024-01-16 00:00:00)` is still mutable
-   - **Accept**: Update aggregate, emit revised count
-4. **Rating Engine**:
-   - Detects updated aggregation (`is_final: false`)
-   - Re-calculates charge
-   - Emits correction event
-5. **Invoice**:
-   - If invoice not yet issued: update accumulates
-   - If invoice already issued: triggers re-rating workflow
+   - Detects: `event_time < watermark`
+   - Routes to `telemetry-events-late` topic
+4. **Re-Rating Service**:
+   - Consumes from `telemetry-events-late`
+   - Deterministically rates the single event
+   - Emits a new `RatedCharge` for the delta
+5. **Invoice Generator**:
+   - Detects an `issued` invoice for the period
+   - Switches to **Correction Mode**
+   - Invoices only the new delta charges as a separate `Correction` invoice.
 
 ---
 

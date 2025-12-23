@@ -189,10 +189,9 @@ CREATE INDEX idx_aggregated_finalized
   ON aggregated_usage(customer_id, is_final, window_start)
   WHERE is_final = true;
 
--- Unique constraint: One aggregation per customer/metric/window (unless re-rating)
+-- Unique constraint: One aggregation per customer/metric/window
 CREATE UNIQUE INDEX idx_aggregated_unique_window 
-  ON aggregated_usage(customer_id, metric_type, window_start, window_end)
-  WHERE rerating_job_id IS NULL;
+  ON aggregated_usage(customer_id, metric_type, window_start, window_end);
 ```
 
 ---
@@ -335,8 +334,8 @@ CREATE TABLE rated_charges (
   -- Timing
   calculated_at TIMESTAMPTZ NOT NULL,
   
-  -- Re-rating
-  rerating_job_id UUID REFERENCES rerating_jobs(job_id),
+  -- Re-rating tracking (Optional)
+  charge_type VARCHAR(20) DEFAULT 'standard', -- 'standard', 'correction'
   supersedes_charge_id UUID REFERENCES rated_charges(charge_id),
   
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -457,54 +456,7 @@ CREATE INDEX idx_line_items_charges
 
 ---
 
-## 6. Re-rating Jobs
-
-Correction workflow tracking.
-
-```sql
-CREATE TABLE rerating_jobs (
-  job_id UUID PRIMARY KEY,
-  
-  triggered_by VARCHAR(50) NOT NULL,  -- 'late_events', 'bug_fix', 'dispute', 'backfill'
-  reason TEXT NOT NULL,
-  triggered_by_user VARCHAR(255),
-  
-  -- Scope
-  customer_ids UUID[],  -- NULL = all customers
-  metric_types VARCHAR(100)[] NOT NULL,
-  window_start TIMESTAMPTZ NOT NULL,
-  window_end TIMESTAMPTZ NOT NULL,
-  
-  -- Price book to use
-  price_book_id UUID REFERENCES price_books(price_book_id),
-  price_version VARCHAR(50),
-  
-  -- Execution
-  status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending', 'running', 'completed', 'failed'
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  error_message TEXT,
-  
-  -- Results
-  aggregations_created INT DEFAULT 0,
-  charges_created INT DEFAULT 0,
-  correction_invoices_issued INT DEFAULT 0,
-  total_adjustment_amount DECIMAL(12, 2) DEFAULT 0,
-  
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  CONSTRAINT chk_rerating_window CHECK (window_start < window_end),
-  CONSTRAINT chk_rerating_status CHECK (status IN ('pending', 'running', 'completed', 'failed'))
-);
-
--- Indexes
-CREATE INDEX idx_rerating_status 
-  ON rerating_jobs(status, created_at);
-
-CREATE INDEX idx_rerating_window 
-  ON rerating_jobs(window_start, window_end);
-```
+> **Note**: In the current implementation, re-rating of late events is handled reactively by the `ReRatingService`. Large-scale manual re-rating jobs remain a point for future enhancement.
 
 ---
 

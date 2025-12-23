@@ -142,8 +142,8 @@ Single-tenant for simplicity. Tenant isolation is its own complexity.
 ### 4. ML/Forecasting
 No predictions. Pure deterministic computation.
 
-### 5. Currency Conversion
-Single currency (USD). FX rates add significant complexity.
+### 5. Advanced Tax & Currency
+While initially out of scope, the system now supports **regional tax calculation** (VAT, etc.) and **multi-currency billing** with automated exchange rates, demonstrating the extensibility of the core rating engine.
 
 ---
 
