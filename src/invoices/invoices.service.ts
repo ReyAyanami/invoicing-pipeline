@@ -67,12 +67,22 @@ export class InvoicesService {
     // Group charges by metric type
     const chargesByMetric = this.groupChargesByMetric(charges);
 
-    // Calculate totals using Money utilities for precision
-    const chargeAmounts = charges.map((c) => c.subtotal);
-    const subtotal = Money.sum(chargeAmounts);
+    // Get customer preferring billing currency
+    const customer = await this.customersService.findOne(customerId);
+    const currency = generateInvoiceDto.currency ?? customer.billingCurrency ?? 'USD';
+    const exchangeRate = this.getExchangeRate(currency);
 
-    // Apply baseline 5% tax
-    const tax = this.calculateTax(subtotal);
+    // Calculate totals using Money utilities for precision
+    let subtotal = Money.sum(charges.map((c) => c.subtotal));
+
+    // Convert to target currency if needed
+    if (exchangeRate !== '1.00') {
+      subtotal = Money.multiply(subtotal, exchangeRate);
+    }
+
+    // Apply regional tax
+    const taxRate = this.getTaxRate(customer);
+    const tax = Money.multiply(subtotal, taxRate);
 
     // Initial total before credits
     const totalBeforeCredits = Money.add(subtotal, tax);
@@ -92,6 +102,7 @@ export class InvoicesService {
       customerId,
       billingPeriodStart: new Date(periodStart),
       billingPeriodEnd: new Date(periodEnd),
+      currency,
       subtotal,
       tax,
       creditsApplied,
@@ -112,6 +123,7 @@ export class InvoicesService {
     const lineItems = await this.createLineItems(
       savedInvoice.invoiceId,
       chargesByMetric,
+      exchangeRate,
     );
 
     this.logger.log(
@@ -141,6 +153,7 @@ export class InvoicesService {
   private async createLineItems(
     invoiceId: string,
     chargesByMetric: Map<string, Array<RatedCharge>>,
+    exchangeRate: string = '1.00',
   ): Promise<InvoiceLineItem[]> {
     const lineItems: InvoiceLineItem[] = [];
     let lineNumber = 1;
@@ -151,7 +164,13 @@ export class InvoicesService {
       const amounts = charges.map((c) => c.subtotal);
 
       const quantity = Quantity.add(...quantities);
-      const amount = Money.sum(amounts);
+      let amount = Money.sum(amounts);
+
+      // Convert amount to target currency
+      if (exchangeRate !== '1.00') {
+        amount = Money.multiply(amount, exchangeRate);
+      }
+
 
       // Calculate unit price
       const unitPrice = Money.greaterThan(quantity, '0')
@@ -222,6 +241,46 @@ export class InvoicesService {
     return invoice;
   }
 
+  /**
+   * Export invoice line items to CSV format
+   */
+  async exportToCsv(id: string): Promise<string> {
+    const invoice = await this.findOne(id);
+    const customer = await this.customersService.findOne(invoice.customerId);
+
+    const headers = ['Line #', 'Description', 'Metric', 'Quantity', 'Unit', 'Unit Price', 'Amount'];
+    const rows = invoice.lineItems.map((item) => [
+      item.lineNumber,
+      item.description,
+      item.metricType,
+      item.quantity,
+      item.unit,
+      item.unitPrice,
+      item.amount,
+    ]);
+
+    const taxRate = this.getTaxRate(customer);
+    const taxPercentage = (parseFloat(taxRate) * 100).toFixed(0);
+
+    const csvContent = [
+      `Invoice Number,${invoice.invoiceNumber}`,
+      `Customer ID,${invoice.customerId}`,
+      `Period,${invoice.billingPeriodStart.toISOString()} to ${invoice.billingPeriodEnd.toISOString()}`,
+      `Status,${invoice.status}`,
+      `Currency,${invoice.currency}`,
+      '',
+      headers.join(','),
+      ...rows.map((row) => row.join(',')),
+      '',
+      `Subtotal,,,,,$,${invoice.subtotal}`,
+      `Tax (${taxPercentage}%),,,,,$,${invoice.tax}`,
+      `Credits Applied,,,,,$,${invoice.creditsApplied}`,
+      `Total,,,,,$,${invoice.total}`,
+    ].join('\n');
+
+    return csvContent;
+  }
+
   private formatMetricName(metricType: string): string {
     return metricType
       .split('_')
@@ -230,10 +289,21 @@ export class InvoicesService {
   }
 
   /**
-   * Calculate automated 5% tax
+   * Get tax rate based on customer's region from metadata.
+   * Defaults to US-STANDARD (5%).
    */
-  private calculateTax(subtotal: Money): Money {
-    return Money.multiply(subtotal, '0.05');
+  private getTaxRate(customer: any): string {
+    const region = (customer.metadata?.taxRegion as string) ?? 'US-STANDARD';
+
+    const rates: Record<string, string> = {
+      'US-STANDARD': '0.05',
+      'EU-DE': '0.19', // Germany VAT
+      'EU-FR': '0.20', // France VAT
+      'UK-VAT': '0.20',
+      'NO-TAX': '0.00',
+    };
+
+    return rates[region] ?? '0.05';
   }
 
   /**
@@ -298,5 +368,20 @@ export class InvoicesService {
       creditsApplied: totalCreditsApplied,
       adjustments,
     };
+  }
+
+  /**
+   * Mock exchange rates (USD based)
+   */
+  private getExchangeRate(currency: string): string {
+    const rates: Record<string, string> = {
+      USD: '1.00',
+      EUR: '0.92',
+      GBP: '0.78',
+      JPY: '150.00',
+      BRL: '5.00',
+    };
+
+    return rates[currency] ?? '1.00';
   }
 }

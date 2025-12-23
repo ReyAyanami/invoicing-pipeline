@@ -9,6 +9,7 @@ import { PriceBooksModule } from './price-books/price-books.module';
 import { AggregationModule } from './aggregation/aggregation.module';
 import { RatingModule } from './rating/rating.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InvoicesModule } from './invoices/invoices.module';
     AggregationModule,
     RatingModule,
     InvoicesModule,
+    AnalyticsModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

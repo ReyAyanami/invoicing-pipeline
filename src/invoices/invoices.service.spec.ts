@@ -204,6 +204,135 @@ describe('InvoicesService', () => {
         }),
       );
     });
+
+    it('should apply regional tax (EU-DE - 19%)', async () => {
+      const dto = {
+        customerId: 'customer-123',
+        periodStart: '2024-01-01',
+        periodEnd: '2024-01-31',
+      };
+
+      const charges = [
+        {
+          chargeId: 'charge-1',
+          subtotal: '100.00',
+          quantity: '1',
+          rule: { metricType: 'api_calls', unit: 'requests' },
+        },
+      ];
+
+      mockCustomersService.findOne.mockResolvedValue({
+        id: 'customer-123',
+        metadata: { taxRegion: 'EU-DE' },
+      });
+      mockRatingService.findChargesForPeriod.mockResolvedValue(charges);
+      mockCreditRepository.find.mockResolvedValue([]);
+      mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-123' }));
+      mockInvoiceRepository.save.mockImplementation((arg) => arg);
+      mockLineItemRepository.create.mockImplementation((arg) => arg);
+      mockLineItemRepository.save.mockImplementation((arg) => arg);
+
+      mockInvoiceRepository.findOne.mockResolvedValue({
+        invoiceId: 'inv-123',
+        subtotal: '100.00',
+        tax: '19.00',
+        total: '119.00',
+        lineItems: [],
+      });
+
+      const result = await service.generateInvoice(dto);
+
+      expect(mockInvoiceRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tax: '19.00',
+          total: '119.00',
+        }),
+      );
+    });
+
+    it('should apply currency conversion (BRL - 5.0)', async () => {
+      const dto = {
+        customerId: 'customer-123',
+        periodStart: '2024-01-01',
+        periodEnd: '2024-01-31',
+        currency: 'BRL',
+      };
+
+      const charges = [
+        {
+          chargeId: 'charge-1',
+          subtotal: '100.00',
+          quantity: '1',
+          rule: { metricType: 'api_calls', unit: 'requests' },
+        },
+      ];
+
+      mockCustomersService.findOne.mockResolvedValue({
+        id: 'customer-123',
+        billingCurrency: 'BRL',
+      });
+      mockRatingService.findChargesForPeriod.mockResolvedValue(charges);
+      mockCreditRepository.find.mockResolvedValue([]);
+      mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-123' }));
+      mockInvoiceRepository.save.mockImplementation((arg) => arg);
+      mockLineItemRepository.create.mockImplementation((arg) => arg);
+      mockLineItemRepository.save.mockImplementation((arg) => arg);
+
+      mockInvoiceRepository.findOne.mockResolvedValue({
+        invoiceId: 'inv-123',
+        currency: 'BRL',
+        subtotal: '500.00',
+        tax: '25.00',
+        total: '525.00',
+        lineItems: [],
+      });
+
+      const result = await service.generateInvoice(dto);
+
+      expect(mockInvoiceRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currency: 'BRL',
+          subtotal: '500.00',
+        }),
+      );
+    });
+  });
+
+  describe('exportToCsv', () => {
+    it('should generate a CSV string', async () => {
+      const invoice = {
+        invoiceNumber: 'INV-123',
+        customerId: 'customer-123',
+        billingPeriodStart: new Date('2024-01-01'),
+        billingPeriodEnd: new Date('2024-01-31'),
+        status: 'draft',
+        subtotal: '100.00',
+        tax: '5.00',
+        creditsApplied: '0.00',
+        total: '105.00',
+        lineItems: [
+          {
+            lineNumber: 1,
+            description: 'API Calls',
+            metricType: 'api_calls',
+            quantity: '1000',
+            unit: 'requests',
+            unitPrice: '0.10',
+            amount: '100.00',
+          },
+        ],
+      };
+
+      mockInvoiceRepository.findOne.mockResolvedValue(invoice);
+
+      const result = await service.exportToCsv('inv-123');
+
+      expect(result).toContain('Invoice Number,INV-123');
+      expect(result).toContain('API Calls,api_calls,1000,requests,0.10,100.00');
+      expect(result).toContain('Total,,,,,$,105.00');
+    });
   });
 
   describe('findOne', () => {

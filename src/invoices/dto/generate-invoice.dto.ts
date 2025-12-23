@@ -1,4 +1,4 @@
-import { IsString, IsDateString } from 'class-validator';
+import { IsString, IsDateString, IsOptional } from 'class-validator';
 
 export class GenerateInvoiceDto {
   @IsString()
@@ -9,4 +9,8 @@ export class GenerateInvoiceDto {
 
   @IsDateString()
   periodEnd: string;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
 }
