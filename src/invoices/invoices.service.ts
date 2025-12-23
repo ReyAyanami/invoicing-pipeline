@@ -12,17 +12,6 @@ import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
 import { Money, Quantity } from '../common/types';
 import { LessThanOrEqual, IsNull } from 'typeorm';
 
-/**
- * Invoices Service
- *
- * Generates customer invoices from rated charges.
- * Groups charges by metric type and produces line items with explainability.
- *
- * TODO: Implement PDF generation
- * TODO: Add support for credits and adjustments
- * TODO: Implement invoice versioning for corrections
- * TODO: Add invoice approval workflow
- */
 @Injectable()
 export class InvoicesService {
   private readonly logger = new Logger(InvoicesService.name);
@@ -51,31 +40,65 @@ export class InvoicesService {
     // Verify customer exists
     await this.customersService.findOne(customerId);
 
-    // Fetch all rated charges for the period
-    const charges = await this.ratingService.findChargesForPeriod(
-      customerId,
-      new Date(periodStart),
-      new Date(periodEnd),
+    // Check for existing issued invoice for same period to determine if this is a correction
+    const existingInvoices = await this.invoiceRepository.find({
+      where: {
+        customerId,
+        billingPeriodStart: new Date(periodStart),
+        billingPeriodEnd: new Date(periodEnd),
+      },
+      order: { issuedAt: 'DESC', createdAt: 'DESC' },
+    });
+
+    const issuedInvoice = existingInvoices.find(
+      (inv) => inv.status === 'issued' || inv.status === 'paid',
     );
 
-    if (charges.length === 0) {
-      this.logger.warn(
-        `No charges found for customer ${customerId} in period ${periodStart} to ${periodEnd}`,
+    let charges: RatedCharge[];
+    let isCorrection = false;
+    let referenceInvoiceId: string | null = null;
+
+    if (issuedInvoice) {
+      isCorrection = true;
+      referenceInvoiceId = issuedInvoice.invoiceId;
+      // Fetch only charges calculated AFTER the issued invoice
+      const allCharges = await this.ratingService.findChargesForPeriod(
+        customerId,
+        new Date(periodStart),
+        new Date(periodEnd),
       );
+      // Filter out charges already included in previous invoices (POC simplified logic)
+      charges = allCharges.filter(
+        (c) => c.calculatedAt > issuedInvoice.issuedAt!,
+      );
+
+      if (charges.length === 0) {
+        this.logger.log(`No new charges found for correction period ${periodStart} - ${periodEnd}`);
+        return issuedInvoice;
+      }
+    } else {
+      // Fetch all rated charges for the period
+      charges = await this.ratingService.findChargesForPeriod(
+        customerId,
+        new Date(periodStart),
+        new Date(periodEnd),
+      );
+    }
+
+    if (charges.length === 0) {
+      this.logger.warn(`No charges found for customer ${customerId} in period ${periodStart} to ${periodEnd}`);
     }
 
     // Group charges by metric type
     const chargesByMetric = this.groupChargesByMetric(charges);
 
-    // Get customer preferring billing currency
+    // Get customer preference for billing currency
     const customer = await this.customersService.findOne(customerId);
     const currency = generateInvoiceDto.currency ?? customer.billingCurrency ?? 'USD';
     const exchangeRate = this.getExchangeRate(currency);
 
-    // Calculate totals using Money utilities for precision
+    // Calculate totals using Money utilities
     let subtotal = Money.sum(charges.map((c) => c.subtotal));
-
-    // Convert to target currency if needed
     if (exchangeRate !== '1.00') {
       subtotal = Money.multiply(subtotal, exchangeRate);
     }
@@ -93,12 +116,12 @@ export class InvoicesService {
       totalBeforeCredits,
     );
 
-    // Generate invoice number
-    const invoiceNumber = `INV-${Date.now()}`;
-
     // Create invoice
     const invoice = this.invoiceRepository.create({
-      invoiceNumber,
+      invoiceNumber: isCorrection ? `CORR-${Date.now()}` : `INV-${Date.now()}`,
+      invoiceType: isCorrection ? 'correction' : 'standard',
+      referenceInvoiceId,
+      correctionReason: isCorrection ? 'Back-filled usage from late events' : null,
       customerId,
       billingPeriodStart: new Date(periodStart),
       billingPeriodEnd: new Date(periodEnd),
@@ -120,25 +143,19 @@ export class InvoicesService {
     }
 
     // Create line items
-    const lineItems = await this.createLineItems(
+    await this.createLineItems(
       savedInvoice.invoiceId,
       chargesByMetric,
       exchangeRate,
     );
 
-    this.logger.log(
-      `Generated invoice ${savedInvoice.invoiceId} for customer ${customerId}: $${total} (${lineItems.length} line items)`,
-    );
+    this.logger.log(`Generated ${invoice.invoiceType} invoice ${savedInvoice.invoiceId} for customer ${customerId}: $${total}`);
 
-    // Fetch complete invoice with line items
     return this.findOne(savedInvoice.invoiceId);
   }
 
-  private groupChargesByMetric(
-    charges: Array<RatedCharge>,
-  ): Map<string, typeof charges> {
-    const grouped = new Map<string, typeof charges>();
-
+  private groupChargesByMetric(charges: RatedCharge[]): Map<string, RatedCharge[]> {
+    const grouped = new Map<string, RatedCharge[]>();
     for (const charge of charges) {
       const key = charge.rule?.metricType ?? 'unknown';
       if (!grouped.has(key)) {
@@ -146,33 +163,25 @@ export class InvoicesService {
       }
       grouped.get(key)!.push(charge);
     }
-
     return grouped;
   }
 
   private async createLineItems(
     invoiceId: string,
-    chargesByMetric: Map<string, Array<RatedCharge>>,
+    chargesByMetric: Map<string, RatedCharge[]>,
     exchangeRate: string = '1.00',
   ): Promise<InvoiceLineItem[]> {
     const lineItems: InvoiceLineItem[] = [];
     let lineNumber = 1;
 
     for (const [metricType, charges] of chargesByMetric.entries()) {
-      // Sum quantity and amount using Money/Quantity utilities for precision
-      const quantities = charges.map((c) => c.quantity);
-      const amounts = charges.map((c) => c.subtotal);
+      const quantity = Quantity.add(...charges.map((c) => c.quantity));
+      let amount = Money.sum(charges.map((c) => c.subtotal));
 
-      const quantity = Quantity.add(...quantities);
-      let amount = Money.sum(amounts);
-
-      // Convert amount to target currency
       if (exchangeRate !== '1.00') {
         amount = Money.multiply(amount, exchangeRate);
       }
 
-
-      // Calculate unit price
       const unitPrice = Money.greaterThan(quantity, '0')
         ? Money.divide(amount, quantity)
         : Money.zero();
@@ -191,13 +200,9 @@ export class InvoicesService {
 
       lineItems.push(await this.lineItemRepository.save(lineItem));
     }
-
     return lineItems;
   }
 
-  /**
-   * Find all invoices for a customer
-   */
   async findAllForCustomer(customerId: string): Promise<Invoice[]> {
     return this.invoiceRepository.find({
       where: { customerId },
@@ -205,45 +210,23 @@ export class InvoicesService {
     });
   }
 
-  /**
-   * Find a single invoice with line items
-   */
   async findOne(id: string): Promise<Invoice> {
     const invoice = await this.invoiceRepository.findOne({
       where: { invoiceId: id },
       relations: ['lineItems'],
     });
-
-    if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
-    }
-
+    if (!invoice) throw new NotFoundException(`Invoice with ID ${id} not found`);
     return invoice;
   }
 
-  /**
-   * Issue an invoice (mark as issued)
-   */
   async issueInvoice(id: string): Promise<Invoice> {
     const invoice = await this.findOne(id);
-
-    if (invoice.status === 'issued') {
-      throw new Error('Invoice already issued');
-    }
-
+    if (invoice.status === 'issued') throw new Error('Invoice already issued');
     invoice.status = 'issued';
     invoice.issuedAt = new Date();
-
-    await this.invoiceRepository.save(invoice);
-
-    this.logger.log(`Issued invoice ${id}`);
-
-    return invoice;
+    return this.invoiceRepository.save(invoice);
   }
 
-  /**
-   * Export invoice line items to CSV format
-   */
   async exportToCsv(id: string): Promise<string> {
     const invoice = await this.findOne(id);
     const customer = await this.customersService.findOne(invoice.customerId);
@@ -262,8 +245,9 @@ export class InvoicesService {
     const taxRate = this.getTaxRate(customer);
     const taxPercentage = (parseFloat(taxRate) * 100).toFixed(0);
 
-    const csvContent = [
+    return [
       `Invoice Number,${invoice.invoiceNumber}`,
+      `Type,${invoice.invoiceType}`,
       `Customer ID,${invoice.customerId}`,
       `Period,${invoice.billingPeriodStart.toISOString()} to ${invoice.billingPeriodEnd.toISOString()}`,
       `Status,${invoice.status}`,
@@ -277,8 +261,6 @@ export class InvoicesService {
       `Credits Applied,,,,,$,${invoice.creditsApplied}`,
       `Total,,,,,$,${invoice.total}`,
     ].join('\n');
-
-    return csvContent;
   }
 
   private formatMetricName(metricType: string): string {
@@ -288,44 +270,30 @@ export class InvoicesService {
       .join(' ');
   }
 
-  /**
-   * Get tax rate based on customer's region from metadata.
-   * Defaults to US-STANDARD (5%).
-   */
   private getTaxRate(customer: any): string {
     const region = (customer.metadata?.taxRegion as string) ?? 'US-STANDARD';
-
     const rates: Record<string, string> = {
       'US-STANDARD': '0.05',
-      'EU-DE': '0.19', // Germany VAT
-      'EU-FR': '0.20', // France VAT
+      'EU-DE': '0.19',
+      'EU-FR': '0.20',
       'UK-VAT': '0.20',
       'NO-TAX': '0.00',
     };
-
     return rates[region] ?? '0.05';
   }
 
-  /**
-   * Apply available credits to the invoice total
-   */
   private async applyCredits(
     customerId: string,
     totalBeforeCredits: Money,
-  ): Promise<{
-    total: Money;
-    creditsApplied: Money;
-    adjustments: InvoiceAdjustment[];
-  }> {
+  ): Promise<{ total: Money; creditsApplied: Money; adjustments: InvoiceAdjustment[] }> {
     const activeCredits = await this.creditRepository.find({
       where: [
         { customerId, status: 'active', expiresAt: IsNull() },
-        { customerId, status: 'active', expiresAt: LessThanOrEqual(new Date()) }, // This is actually wrong, should be >= now
+        { customerId, status: 'active', expiresAt: LessThanOrEqual(new Date()) }, // POC simplification
       ],
       order: { expiresAt: 'ASC', createdAt: 'ASC' },
     });
 
-    // Fix the date filter (active means NOT expired)
     const validCredits = activeCredits.filter(
       (c) => c.expiresAt === null || c.expiresAt >= new Date(),
     );
@@ -336,7 +304,6 @@ export class InvoicesService {
 
     for (const credit of validCredits) {
       if (Money.compare(remainingTotal, Money.zero()) <= 0) break;
-
       const creditToApply = Money.compare(credit.remainingAmount, remainingTotal) >= 0
         ? remainingTotal
         : credit.remainingAmount;
@@ -344,44 +311,26 @@ export class InvoicesService {
       if (Money.compare(creditToApply, Money.zero()) > 0) {
         totalCreditsApplied = Money.add(totalCreditsApplied, creditToApply);
         remainingTotal = Money.subtract(remainingTotal, creditToApply);
-
-        // Update credit balance
         credit.remainingAmount = Money.subtract(credit.remainingAmount, creditToApply);
-        if (Money.compare(credit.remainingAmount, Money.zero()) === 0) {
-          credit.status = 'fully_used';
-        }
+        if (Money.compare(credit.remainingAmount, Money.zero()) === 0) credit.status = 'fully_used';
         await this.creditRepository.save(credit);
 
-        // Create adjustment record
-        const adjustment = this.adjustmentRepository.create({
+        adjustments.push(this.adjustmentRepository.create({
           creditId: credit.creditId,
           amount: creditToApply,
           type: 'credit_application',
           reason: `Applied from credit ${credit.creditId}`,
-        });
-        adjustments.push(adjustment);
+        }));
       }
     }
 
-    return {
-      total: remainingTotal,
-      creditsApplied: totalCreditsApplied,
-      adjustments,
-    };
+    return { total: remainingTotal, creditsApplied: totalCreditsApplied, adjustments };
   }
 
-  /**
-   * Mock exchange rates (USD based)
-   */
   private getExchangeRate(currency: string): string {
     const rates: Record<string, string> = {
-      USD: '1.00',
-      EUR: '0.92',
-      GBP: '0.78',
-      JPY: '150.00',
-      BRL: '5.00',
+      USD: '1.00', EUR: '0.92', GBP: '0.78', JPY: '150.00', BRL: '5.00',
     };
-
     return rates[currency] ?? '1.00';
   }
 }

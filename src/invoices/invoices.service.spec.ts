@@ -125,6 +125,7 @@ describe('InvoicesService', () => {
       mockLineItemRepository.save.mockImplementation((arg) => arg);
       mockCreditRepository.find.mockResolvedValue([]); // No credits
       mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.find.mockResolvedValue([]); // Mock existing invoices check
 
       mockInvoiceRepository.findOne.mockResolvedValue({
         invoiceId: 'inv-123',
@@ -178,6 +179,7 @@ describe('InvoicesService', () => {
       mockCreditRepository.save.mockImplementation((arg) => arg);
       mockAdjustmentRepository.create.mockImplementation((arg) => arg);
       mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.find.mockResolvedValue([]); // Mock existing invoices check
       mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-123' }));
       mockInvoiceRepository.save.mockImplementation((arg) => arg);
       mockLineItemRepository.create.mockImplementation((arg) => arg);
@@ -228,6 +230,7 @@ describe('InvoicesService', () => {
       mockRatingService.findChargesForPeriod.mockResolvedValue(charges);
       mockCreditRepository.find.mockResolvedValue([]);
       mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.find.mockResolvedValue([]); // Mock existing invoices check
       mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-123' }));
       mockInvoiceRepository.save.mockImplementation((arg) => arg);
       mockLineItemRepository.create.mockImplementation((arg) => arg);
@@ -275,6 +278,7 @@ describe('InvoicesService', () => {
       mockRatingService.findChargesForPeriod.mockResolvedValue(charges);
       mockCreditRepository.find.mockResolvedValue([]);
       mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.find.mockResolvedValue([]); // Mock existing invoices check
       mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-123' }));
       mockInvoiceRepository.save.mockImplementation((arg) => arg);
       mockLineItemRepository.create.mockImplementation((arg) => arg);
@@ -295,6 +299,60 @@ describe('InvoicesService', () => {
         expect.objectContaining({
           currency: 'BRL',
           subtotal: '500.00',
+        }),
+      );
+    });
+
+    it('should generate a correction invoice if an issued invoice exists', async () => {
+      const dto = {
+        customerId: 'customer-123',
+        periodStart: '2024-01-01',
+        periodEnd: '2024-01-31',
+      };
+
+      const issuedInvoice = {
+        invoiceId: 'inv-issued-1',
+        status: 'issued',
+        issuedAt: new Date('2024-02-01T10:00:00Z'),
+        billingPeriodStart: new Date('2024-01-01'),
+        billingPeriodEnd: new Date('2024-01-31'),
+      };
+
+      const deltaCharges = [
+        {
+          chargeId: 'charge-delta',
+          subtotal: '20.00',
+          quantity: '5',
+          calculatedAt: new Date('2024-02-02T10:00:00Z'), // After issuedAt
+          rule: { metricType: 'api_calls', unit: 'requests' },
+        },
+      ];
+
+      mockInvoiceRepository.find.mockResolvedValue([issuedInvoice]);
+      mockCustomersService.findOne.mockResolvedValue({ id: 'customer-123' });
+      mockRatingService.findChargesForPeriod.mockResolvedValue(deltaCharges);
+      mockCreditRepository.find.mockResolvedValue([]);
+      mockAdjustmentRepository.save.mockResolvedValue({});
+      mockInvoiceRepository.create.mockImplementation((arg) => ({ ...arg, invoiceId: 'inv-corr-1' }));
+      mockInvoiceRepository.save.mockImplementation((arg) => arg);
+      mockLineItemRepository.save.mockImplementation((arg) => arg);
+
+      mockInvoiceRepository.findOne.mockResolvedValue({
+        invoiceId: 'inv-corr-1',
+        invoiceType: 'correction',
+        referenceInvoiceId: 'inv-issued-1',
+        subtotal: '20.00',
+        lineItems: [],
+      });
+
+      const result = await service.generateInvoice(dto);
+
+      expect(result.invoiceType).toBe('correction');
+      expect(result.referenceInvoiceId).toBe('inv-issued-1');
+      expect(mockInvoiceRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          invoiceType: 'correction',
+          subtotal: '20.00',
         }),
       );
     });
