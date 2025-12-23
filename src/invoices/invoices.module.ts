@@ -4,12 +4,13 @@ import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
 import { Invoice } from './entities/invoice.entity';
 import { InvoiceLineItem } from './entities/invoice-line-item.entity';
+import { InvoiceAdjustment } from './entities/invoice-adjustment.entity';
 import { RatingModule } from '../rating/rating.module';
 import { CustomersModule } from '../customers/customers.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Invoice, InvoiceLineItem]),
+    TypeOrmModule.forFeature([Invoice, InvoiceLineItem, InvoiceAdjustment]),
     RatingModule,
     CustomersModule,
   ],
@@ -17,4 +18,4 @@ import { CustomersModule } from '../customers/customers.module';
   providers: [InvoicesService],
   exports: [InvoicesService],
 })
-export class InvoicesModule {}
+export class InvoicesModule { }
