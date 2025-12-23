@@ -152,4 +152,10 @@ export const Quantity = {
   zero(): Quantity {
     return '0.000000' as Quantity;
   },
+
+  max(a: Quantity | string, b: Quantity | string): Quantity {
+    const decA = new Decimal(a);
+    const decB = new Decimal(b);
+    return Decimal.max(decA, decB).toFixed(6) as Quantity;
+  },
 };

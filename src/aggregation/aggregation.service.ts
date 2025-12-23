@@ -58,8 +58,8 @@ export class AggregationService implements OnModuleInit {
   private readonly ALLOWED_LATENESS_MS = 60 * 60 * 1000; // 1 hour late arrival tolerance
   private readonly WATERMARK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
-  // In-memory window state
-  private readonly windows = new Map<string, WindowState>();
+  // No longer using in-memory window state for persistence
+  // Watermark timer still used to finalize windows in DB
   private watermarkTimer?: NodeJS.Timeout;
 
   constructor(
@@ -101,9 +101,8 @@ export class AggregationService implements OnModuleInit {
     });
 
     await this.consumer.run({
-      eachMessage: (payload: EachMessagePayload) => {
-        this.handleMessage(payload);
-        return Promise.resolve();
+      eachMessage: async (payload: EachMessagePayload) => {
+        await this.handleMessage(payload);
       },
     });
 
@@ -112,7 +111,7 @@ export class AggregationService implements OnModuleInit {
     );
   }
 
-  private handleMessage(payload: EachMessagePayload): void {
+  private async handleMessage(payload: EachMessagePayload): Promise<void> {
     const { message } = payload;
 
     try {
@@ -122,7 +121,7 @@ export class AggregationService implements OnModuleInit {
         `Processing event: ${event.eventId} at ${event.eventTime}`,
       );
 
-      this.addEventToWindow(event);
+      await this.addEventToWindow(event);
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Failed to process message: ${err.message}`, err.stack);
@@ -133,9 +132,10 @@ export class AggregationService implements OnModuleInit {
   /**
    * Add event to appropriate time window based on event_time
    */
-  private addEventToWindow(event: TelemetryEvent): void {
+  private async addEventToWindow(event: TelemetryEvent): Promise<void> {
     const eventTime = new Date(event.eventTime);
     const windowStart = this.getWindowStart(eventTime);
+    const windowEnd = new Date(windowStart.getTime() + this.WINDOW_SIZE_MS);
 
     // Check if event is too late (beyond allowed lateness)
     const now = new Date();
@@ -145,41 +145,60 @@ export class AggregationService implements OnModuleInit {
       this.logger.warn(
         `Event ${event.eventId} arrived too late. Window: ${windowStart.toISOString()}, Watermark: ${watermark.toISOString()}`,
       );
-      // TODO: Send to late events topic for re-rating
+
+      // REDIRECT TO LATE EVENTS TOPIC
+      await this.kafkaService.sendMessage(KAFKA_TOPICS.LATE_EVENTS, {
+        ...event,
+        receivedAt: now.toISOString(),
+        watermark: watermark.toISOString(),
+      });
       return;
     }
 
-    // Determine metric type from event
+    // Determine metric type and get unit
     const metricType = this.getMetricType(event);
+    const unit = this.getUnit(metricType);
 
-    // Create window key
-    const windowKey = this.createWindowKey({
-      customerId: event.customerId,
-      metricType,
-      windowStart,
+    // Fetch existing non-finalized aggregation or create new one
+    let aggregation = await this.aggregatedUsageRepository.findOne({
+      where: {
+        customerId: event.customerId,
+        metricType,
+        windowStart,
+        isFinal: false,
+      },
     });
 
-    // Get or create window state
-    let windowState = this.windows.get(windowKey);
-    if (!windowState) {
-      windowState = {
-        events: [],
+    if (!aggregation) {
+      aggregation = this.aggregatedUsageRepository.create({
+        customerId: event.customerId,
+        metricType,
+        windowStart,
+        windowEnd,
+        value: Quantity.zero(),
+        unit,
         eventCount: 0,
-        lastEventTime: eventTime,
-      };
-      this.windows.set(windowKey, windowState);
-      this.logger.debug(
-        `Created new window: ${windowKey} for ${windowStart.toISOString()}`,
-      );
+        eventIds: [],
+        isFinal: false,
+        version: 1,
+        computedAt: new Date(),
+      });
     }
 
-    // Add event to window
-    windowState.events.push(event);
-    windowState.eventCount++;
-    windowState.lastEventTime = eventTime;
+    // Apply aggregation strategy
+    aggregation.value = this.applyAggregationStrategy(
+      aggregation.value,
+      event,
+      metricType,
+    );
+    aggregation.eventCount++;
+    aggregation.eventIds.push(event.eventId);
+    aggregation.computedAt = new Date();
+
+    await this.aggregatedUsageRepository.save(aggregation);
 
     this.logger.debug(
-      `Added event ${event.eventId} to window ${windowKey} (${windowState.eventCount} events)`,
+      `Updated aggregation for ${metricType} (ID: ${aggregation.aggregationId}): Value=${aggregation.value}, Count=${aggregation.eventCount}`,
     );
   }
 
@@ -197,7 +216,7 @@ export class AggregationService implements OnModuleInit {
   }
 
   /**
-   * Advance watermark and finalize any completed windows
+   * Advance watermark and finalize any completed windows in the database
    */
   private async advanceWatermark(): Promise<void> {
     const now = new Date();
@@ -205,75 +224,40 @@ export class AggregationService implements OnModuleInit {
 
     this.logger.debug(`Advancing watermark to: ${watermark.toISOString()}`);
 
-    const windowsToFinalize: Array<{ key: string; state: WindowState }> = [];
+    // Find all non-finalized windows that have passed the watermark
+    const completedWindows = await this.aggregatedUsageRepository
+      .createQueryBuilder('usage')
+      .where('usage.is_final = :isFinal', { isFinal: false })
+      .andWhere('usage.window_end <= :watermark', { watermark })
+      .getMany();
 
-    // Find windows that should be finalized
-    for (const [windowKey, windowState] of this.windows.entries()) {
-      const { windowStart } = this.parseWindowKey(windowKey);
-      const windowEnd = new Date(windowStart.getTime() + this.WINDOW_SIZE_MS);
+    if (completedWindows.length === 0) return;
 
-      // Window is complete if watermark has passed window end
-      if (watermark >= windowEnd) {
-        windowsToFinalize.push({ key: windowKey, state: windowState });
-      }
-    }
-
-    // Finalize windows
-    for (const { key, state } of windowsToFinalize) {
+    // Finalize each completed window
+    for (const aggregation of completedWindows) {
       try {
-        await this.finalizeWindow(key, state);
-        this.windows.delete(key);
+        await this.finalizeAggregation(aggregation);
       } catch (error) {
         const err = error as Error;
         this.logger.error(
-          `Failed to finalize window ${key}: ${err.message}`,
-          err.stack,
+          `Failed to finalize aggregation ${aggregation.aggregationId}: ${err.message}`,
         );
       }
     }
 
-    if (windowsToFinalize.length > 0) {
-      this.logger.log(
-        `Finalized ${windowsToFinalize.length} windows. Active windows: ${this.windows.size}`,
-      );
-    }
+    this.logger.log(`Finalized ${completedWindows.length} windows`);
   }
 
   /**
-   * Finalize a window by aggregating events and persisting
+   * Finalize an aggregation by setting isFinal and publishing to Kafka
    */
-  private async finalizeWindow(
-    windowKey: string,
-    windowState: WindowState,
+  private async finalizeAggregation(
+    aggregation: AggregatedUsage,
   ): Promise<void> {
-    const { customerId, metricType, windowStart } =
-      this.parseWindowKey(windowKey);
-    const windowEnd = new Date(windowStart.getTime() + this.WINDOW_SIZE_MS);
-
-    // Aggregate events in window
-    const value = this.aggregateValue(windowState.events, metricType);
-    const eventIds = windowState.events.map((e) => e.eventId);
-
-    // Create aggregated usage record
-    const aggregation = this.aggregatedUsageRepository.create({
-      customerId,
-      metricType,
-      windowStart,
-      windowEnd,
-      value,
-      unit: this.getUnit(metricType),
-      eventCount: windowState.eventCount,
-      eventIds,
-      isFinal: true,
-      version: 1,
-      computedAt: new Date(),
-    });
+    aggregation.isFinal = true;
+    aggregation.computedAt = new Date();
 
     const saved = await this.aggregatedUsageRepository.save(aggregation);
-
-    this.logger.log(
-      `Finalized window ${windowKey}: ${value} ${aggregation.unit} from ${windowState.eventCount} events`,
-    );
 
     // Publish to Kafka for downstream rating
     await this.kafkaService.sendMessage(KAFKA_TOPICS.AGGREGATED_USAGE, {
@@ -287,6 +271,10 @@ export class AggregationService implements OnModuleInit {
       eventCount: saved.eventCount,
       isFinal: saved.isFinal,
     });
+
+    this.logger.log(
+      `Published final aggregation ${saved.aggregationId} (${saved.metricType}): ${saved.value} ${saved.unit}`,
+    );
   }
 
   /**
@@ -299,27 +287,7 @@ export class AggregationService implements OnModuleInit {
     return new Date(roundedTimestamp);
   }
 
-  /**
-   * Create window key for Map storage
-   */
-  private createWindowKey(key: WindowKey): string {
-    return `${key.customerId}:${key.metricType}:${key.windowStart.getTime()}`;
-  }
 
-  /**
-   * Parse window key back to components
-   */
-  private parseWindowKey(windowKey: string): WindowKey {
-    const parts = windowKey.split(':');
-    if (parts.length !== 3) {
-      throw new Error(`Invalid window key format: ${windowKey}`);
-    }
-    return {
-      customerId: parts[0],
-      metricType: parts[1],
-      windowStart: new Date(Number(parts[2])),
-    };
-  }
 
   /**
    * Determine metric type from event
@@ -336,21 +304,34 @@ export class AggregationService implements OnModuleInit {
   }
 
   /**
-   * Aggregate value from events in window
-   * Different strategies: COUNT, SUM, AVG, MAX, etc.
+   * Apply aggregation strategy to current value
    */
-  private aggregateValue(
-    events: TelemetryEvent[],
-    _metricType: string,
+  private applyAggregationStrategy(
+    currentValue: Quantity,
+    event: TelemetryEvent,
+    metricType: string,
   ): Quantity {
-    // For now, simple COUNT aggregation
-    // In production, you'd have different strategies per metric type:
-    // - api_calls: COUNT
-    // - storage_bytes: SUM(metadata.bytes)
-    // - request_duration: AVG(metadata.duration_ms)
+    const eventValue = event.metadata?.value ? String(event.metadata.value) : '1';
 
-    const count = events.length;
-    return Quantity.from(count);
+    // Different strategies per metric type:
+    // - api_calls, compute_hours: SUM (incremental)
+    // - storage_gb: MAX (peak usage in window)
+    // Default is COUNT (adding 1)
+
+    switch (metricType) {
+      case 'api_calls':
+      case 'bandwidth_mb':
+      case 'compute_hours':
+        return Quantity.add(currentValue, eventValue);
+
+      case 'storage_gb_peak':
+      case 'concurrent_users_max':
+        return Quantity.max(currentValue, eventValue);
+
+      default:
+        // Default to increment by 1 (COUNT)
+        return Quantity.add(currentValue, '1');
+    }
   }
 
   /**
